@@ -1,0 +1,3 @@
+diag: {"CLICKUP_TOKEN":"OK"}
+raiz: 200
+data: 2026-08-13T21:02:19Z
