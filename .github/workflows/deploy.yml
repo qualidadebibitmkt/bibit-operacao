@@ -1,0 +1,75 @@
+name: Deploy Vercel
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolver time e projeto
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e
+          TEAMS=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "Authorization: Bearer $VERCEL_TOKEN")
+          echo "times:"; echo "$TEAMS" | jq -r '.teams[] | "\(.slug)  \(.id)"'
+          ORG_ID=$(echo "$TEAMS" | jq -r '.teams[] | select(.slug=="bibit-marketing") | .id')
+          if [ -z "$ORG_ID" ] || [ "$ORG_ID" = "null" ]; then ORG_ID=$(echo "$TEAMS" | jq -r '.teams[0].id'); fi
+          echo "ORG_ID escolhido: $ORG_ID"
+          echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
+          echo "VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ" >> $GITHUB_ENV
+
+      - name: Garantir CLICKUP_TOKEN no projeto
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e
+          AUTH="Authorization: Bearer $VERCEL_TOKEN"
+          HAS=$(curl -s "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '[.envs[]? | select(.key=="CLICKUP_TOKEN")] | length')
+          echo "CLICKUP_TOKEN ja existe? $HAS"
+          if [ "$HAS" -ge 1 ]; then exit 0; fi
+          PROJS=$(curl -s "https://api.vercel.com/v9/projects?teamId=$VERCEL_ORG_ID&limit=100" -H "$AUTH" | jq -r '.projects[] | "\(.id) \(.name)"')
+          echo "projetos no time:"; echo "$PROJS"
+          while read -r PID PNAME; do
+            [ "$PID" = "$VERCEL_PROJECT_ID" ] && continue
+            EID=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
+            if [ -n "$EID" ] && [ "$EID" != "null" ]; then
+              VAL=$(curl -s "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$VERCEL_ORG_ID&decrypt=true" -H "$AUTH" | jq -r '.value // empty')
+              if [ -n "$VAL" ]; then
+                echo "::add-mask::$VAL"
+                echo "copiando CLICKUP_TOKEN do projeto: $PNAME"
+                curl -s -X POST "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" -H "Content-Type: application/json" \
+                  -d "{\"key\":\"CLICKUP_TOKEN\",\"value\":\"$VAL\",\"type\":\"encrypted\",\"target\":[\"production\",\"preview\",\"development\"]}" \
+                  | jq -r 'if .created then "env criada com sucesso" else (.error.message // "resposta inesperada") end'
+                exit 0
+              fi
+            fi
+          done <<< "$PROJS"
+          echo "AVISO: nao achei CLICKUP_TOKEN em nenhum projeto irmao — diag vai responder VAZIO"
+
+      - name: Deploy producao
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e
+          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN
+          npx vercel@latest deploy --prod --yes --token=$VERCEL_TOKEN
+
+      - name: Testar e registrar resultado
+        if: always()
+        run: |
+          sleep 10
+          DIAG=$(curl -s --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?diag=1" || echo "sem resposta")
+          RAIZ=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/" || echo "000")
+          printf 'diag: %s\nraiz: %s\ndata: %s\n' "$DIAG" "$RAIZ" "$(date -u +%FT%TZ)" | tee deploy-status.txt
+          git config user.name "deploy-bot"; git config user.email "bot@bibit"
+          git add deploy-status.txt
+          git commit -m "status do deploy [skip ci]" || true
+          git push || true
