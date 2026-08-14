@@ -292,10 +292,11 @@ async function fetchJSON(path){
   if (!r.ok) throw new Error('HTTP ' + r.status + ' em ' + path);
   return r.json();
 }
-async function fetchTasks(listId){
+async function fetchTasks(listId, incluirSub){
   let page = 0, out = [];
+  const sub = incluirSub ? 'true' : 'false';
   while (true) {
-    const j = await fetchJSON(`list/${listId}/task?include_closed=true&subtasks=false&page=${page}`);
+    const j = await fetchJSON(`list/${listId}/task?include_closed=true&subtasks=${sub}&page=${page}`);
     const t = j.tasks || [];
     out = out.concat(t);
     if (t.length < 100) break;
@@ -324,11 +325,19 @@ function parseTudo(raw){
     };
   });
 
-  const vendas = raw.vendas.map(t => {
+  // Vendas por família: o card-pai carrega o total contratado; se o pai não tem valor,
+  // a venda é a soma das parcelas (subtarefas). Nunca conta pai + parcela em dobro.
+  const pais = raw.vendas.filter(t => !t.parent);
+  const filhos = raw.vendas.filter(t => t.parent);
+  const vendas = pais.map(t => {
+    const valorPai = cfNum(t, CF.valorVenda) || 0;
+    const parcelas = filhos.filter(f => f.parent === t.id);
+    const valorParcelas = soma(parcelas.map(f => cfNum(f, CF.valorVenda)));
+    const valor = valorPai > 0 ? valorPai : valorParcelas;
     const ts = cfNum(t, CF.dataPag) || num(t.date_closed) || num(t.date_created);
     const d = ts ? new Date(ts) : null;
-    return { nome: t.name, valor: cfNum(t, CF.valorVenda) || 0, ts, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, status: normaliza(t.status && t.status.status || t.status) };
-  });
+    return { nome: t.name, valor, ts, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, status: normaliza(t.status && t.status.status || t.status) };
+  }).filter(v => v.valor > 0);
 
   const respostas = raw.csat.map(t => {
     const notas = [cfNum(t, CF.csatTraf), cfNum(t, CF.csatSM), cfNum(t, CF.csatRP), cfNum(t, CF.csatVideo)].filter(v => v != null && v > 0);
@@ -364,9 +373,10 @@ function calcAcumulado(D){
   const churnRS = soma(churn.map(c => c.vr));
   const mrrBaseChurn = D.geral.mrrAcum || (mrr + churnRS);
   const cross = soma(vendasAno.map(v => v.valor));
-  const up   = (D.geral.somaUp != null) ? D.geral.somaUp : soma(D.clientes.map(c => c.up));
-  const down = (D.geral.somaDown != null) ? D.geral.somaDown : soma(D.clientes.map(c => c.down));
-  const expCalc = cross + up + down;
+  const upClientes = soma(D.clientes.map(c => c.up));
+  const downClientes = soma(D.clientes.map(c => c.down));
+  const up   = upClientes !== 0 ? upClientes : (D.geral.somaUp != null ? D.geral.somaUp : 0);
+  const down = downClientes !== 0 ? downClientes : (D.geral.somaDown != null ? D.geral.somaDown : 0);
   return {
     ativos: ativos.length,
     mrr,
@@ -381,8 +391,7 @@ function calcAcumulado(D){
     tmpChurn: media(churn.map(c => c.tmp != null ? c.tmp : (c.entrada && c.saida ? mesesEntre(c.entrada, c.saida) : null))),
     tmpAtivos: media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))),
     down, cross, up,
-    exp: D.geral.expDash != null ? D.geral.expDash : expCalc,
-    expCalc,
+    exp: cross + up + down,
     nVendas: vendasAno.length
   };
 }
@@ -415,8 +424,7 @@ function calcMes(D, m){
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
     tmpAtivos: media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
-    exp: (cross != null && up != null && down != null) ? cross + up + down : ((m === MES_ATUAL && D.geral.expMes != null) ? D.geral.expMes : null),
-    expCalc: null,
+    exp: (cross != null && up != null && down != null) ? cross + up + down : null,
     nVendas: vd.length
   };
 }
@@ -440,7 +448,7 @@ const METRICAS = [
   { id:'cross',    label:'Cross Sell +',    span:'',   get:d=>d.cross,    fmt:fmtBRL0, brl:true, sub:d=>d.nVendas?d.nVendas+' vendas':null },
   { id:'up',       label:'Upsell +',        span:'',   get:d=>d.up,       fmt:fmtBRL0, brl:true },
   { id:'expansao', label:'Expansão de Receita', span:'s8', get:d=>d.exp,  fmt:fmtBRL0, brl:true,
-    sub:d=>(d.expCalc!=null && d.exp!=null && Math.abs(d.expCalc-d.exp)>1)?('calc: R$ '+fmtBRL0(d.expCalc)):null }
+    sub:()=>'crossell + upsell − downsell' }
 ];
 
 /* ---------------- estado + render ---------------- */
