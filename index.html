@@ -690,7 +690,8 @@ function detalheDados(){
   }
 
   if (id === 'nps' || id === 'csat') {
-    const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : respMes(D, mes));
+    const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : respMes(D, mes))
+      .filter(r => (id === 'csat' ? r.csat : r.nps) != null);
     return { cols:['Envio','Mês','CSAT','NPS'],
       rows: rs.map(r => [r.nome || 'Envio', r.m != null ? MESES[r.m] : '—', r.csat != null ? fmt2(r.csat) : '—', r.nps != null ? fmt2(r.nps) : '—']),
       resumo: rs.length + ' respostas · CSAT médio ' + fmt2(media(rs.map(r => r.csat))) + ' · NPS médio ' + fmt2(media(rs.map(r => r.nps))) };
