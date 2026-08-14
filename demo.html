@@ -113,17 +113,6 @@
   .tabela tbody tr:hover{background:rgba(94,155,120,.06)}
   .tabela tbody tr:last-child td{border-bottom:0}
   .vazio{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--faint);padding:18px}
-  #detalhe .tbl-wrap{max-height:340px;overflow-y:auto;border-radius:12px;border:1px solid var(--line)}
-  table.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
-  .tbl th{font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;
-    color:var(--faint);text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card2)}
-  .tbl td{padding:8px 12px;border-bottom:1px solid rgba(238,231,223,.045);color:var(--creme)}
-  .tbl tr:hover td{background:rgba(94,155,120,.05)}
-  .tbl td.num,.tbl th.num{text-align:right;font-variant-numeric:tabular-nums}
-  .tbl td.neg{color:var(--clay)}
-  .tbl tfoot td{font-weight:700;border-top:1px solid var(--line);border-bottom:0;background:rgba(94,155,120,.06)}
-  .det-nota{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.4px;line-height:1.8;padding:6px 2px}
-
   .aviso{margin-top:16px;border:1px solid rgba(200,155,118,.35);background:var(--clay-dim);border-radius:12px;
     padding:12px 16px;font-size:13px;color:var(--creme);display:none;line-height:1.55}
   .aviso.on{display:block}
@@ -181,14 +170,6 @@
   <div class="aviso" id="aviso"></div>
 
   <section class="grid" id="grid" aria-live="polite"></section>
-
-  <section class="painel" id="detalhe">
-    <div class="painel-top">
-      <h2>Detalhe · <em id="det-metric">MRR</em> <span id="det-per" class="hint" style="margin-left:6px"></span></h2>
-      <div class="hint">os dados que compõem a métrica no período selecionado</div>
-    </div>
-    <div id="det-body"></div>
-  </section>
 
   <section class="painel">
     <div class="painel-top">
@@ -554,128 +535,6 @@ function renderGrid(){
   });
 }
 
-
-/* ---------------- detalhe por métrica ---------------- */
-const fmtData = (ts) => ts ? new Date(Number(ts)).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit' }) : '—';
-const celR$0 = (v) => ({ t: v == null ? '—' : 'R$ ' + fmtBRL0(v), num: true, neg: v != null && v < 0 });
-const celR$2 = (v) => ({ t: v == null ? '—' : 'R$ ' + fmtBRL2(v), num: true, neg: v != null && v < 0 });
-const celN2  = (v) => ({ t: v == null ? '—' : fmt2(v), num: true });
-
-function detalheData(){
-  const D = state.D; if (!D) return null;
-  const mes = state.periodo === 'acc' ? null : state.periodo;
-  if (mes != null && !state.meses[mes]) return { nota: 'Sem histórico para este mês.' };
-  const fim = mes == null ? Date.now() : fimMes(mes);
-  const ativos = (mes == null ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim)).slice().sort((a, b) => b.vr - a.vr);
-  const churn = (mes == null ? D.clientes.filter(c => c.status === 'churn') : churnNoMes(D, mes)).slice().sort((a, b) => (a.saida || 0) - (b.saida || 0));
-  const rk = (mes == null ? D.ranking.filter(r => r.y === ANO) : rankMes(D, mes)).slice().sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
-  const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : respMes(D, mes));
-  const vd = (mes == null ? D.vendas.filter(v => v.y == null || v.y === ANO) : vendasMes(D, mes)).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  const tmpDe = (c) => (mes == null && c.tmp != null) ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Math.min(fim, c.saida || fim)) : null);
-  const d = dadosPeriodo() || {};
-
-  const tabelaClientes = (lista, extra) => ({
-    cols: ['Cliente', 'Valor Recorrente', extra === 'saida' ? 'Saída' : 'Entrada', 'TMP (meses)'],
-    rows: lista.map(c => [c.nome, celR$0(c.vr), fmtData(extra === 'saida' ? c.saida : c.entrada), celN2(tmpDe(c))]),
-    rodape: [lista.length + (lista.length === 1 ? ' cliente' : ' clientes'), celR$0(soma(lista.map(c => c.vr))), '', celN2(media(lista.map(tmpDe)))]
-  });
-
-  switch (state.metric) {
-    case 'ativos': case 'mrr': case 'ticket': return tabelaClientes(ativos);
-    case 'churnRS': case 'churnN': case 'churnPct':
-      return churn.length ? tabelaClientes(churn, 'saida') : { nota: 'Nenhum churn no período.' };
-    case 'tmpAtivos': return tabelaClientes(ativos);
-    case 'tmpChurn': {
-      const base = mes == null ? churn : churnAte(D, mes).slice().sort((a, b) => (a.saida || 0) - (b.saida || 0));
-      return base.length ? tabelaClientes(base, 'saida') : { nota: 'Nenhum churn até este mês.' };
-    }
-    case 'ltv': {
-      const com = ativos.filter(c => c.ltv > 0);
-      return com.length ? {
-        cols: ['Cliente', 'LTV', 'Valor Recorrente'],
-        rows: com.slice().sort((a, b) => b.ltv - a.ltv).map(c => [c.nome, celR$2(c.ltv), celR$0(c.vr)]),
-        rodape: [com.length + ' clientes', celR$2(media(com.map(c => c.ltv))) , '']
-      } : { nota: 'Nenhum cliente com LTV preenchido.' };
-    }
-    case 'cross':
-      return vd.length ? {
-        cols: ['Venda', 'Valor', 'Data', 'Status'],
-        rows: vd.map(v => [v.nome, celR$0(v.valor), fmtData(v.ts), v.status || '—']),
-        rodape: [vd.length + ' vendas', celR$0(soma(vd.map(v => v.valor))), '', '']
-      } : { nota: 'Nenhuma venda no período.' };
-    case 'up': case 'down': {
-      const campo = state.metric;
-      if (mes == null) {
-        const lista = D.clientes.filter(c => (campo === 'up' ? c.up : c.down) !== 0)
-          .map(c => ({ nome: c.nome, v: campo === 'down' ? negDown(c.down) : c.up }));
-        return lista.length ? {
-          cols: ['Cliente', campo === 'up' ? 'Upsell' : 'Downsell'],
-          rows: lista.sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).map(x => [x.nome, celR$0(x.v)]),
-          rodape: [lista.length + (lista.length === 1 ? ' registro' : ' registros'), celR$0(soma(lista.map(x => x.v)))]
-        } : { nota: campo === 'up' ? 'Nenhum upsell registrado.' : 'Nenhum downsell registrado.' };
-      }
-      const lista = rk.filter(r => (campo === 'up' ? r.up : r.down) !== 0)
-        .map(r => ({ nome: r.nome, v: campo === 'down' ? negDown(r.down) : r.up }));
-      return lista.length ? {
-        cols: ['Card do Ranking', campo === 'up' ? 'Upsell' : 'Downsell'],
-        rows: lista.map(x => [x.nome, celR$0(x.v)]),
-        rodape: ['', celR$0(soma(lista.map(x => x.v)))]
-      } : { nota: (campo === 'up' ? 'Nenhum upsell' : 'Nenhum downsell') + ' neste mês.' };
-    }
-    case 'prod':
-      return rk.length ? {
-        cols: ['Card do Ranking', 'Tarefas', 'Atrasadas', '% Produtividade'],
-        rows: rk.map(r => [r.nome, celN2(r.tot != null ? r.tot : null), celN2(r.atr != null ? r.atr : null), { t: r.prod == null ? '—' : r.prod.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%', num: true }]),
-        rodape: ['média', '', '', { t: (media(rk.map(r => r.prod)) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%', num: true }],
-        nota: mes == null && D.geral.prodAnual != null ? 'O card Produtividade usa o % Produtividade Anual do card 2026 (' + D.geral.prodAnual + '%); a tabela mostra os cards do Ranking no ano.' : null
-      } : { nota: 'Nenhum card de ranking no período.' };
-    case 'nps': case 'csat': {
-      const lista = rs.filter(r => (state.metric === 'nps' ? r.nps : r.csat) != null);
-      return lista.length ? {
-        cols: ['Envio', 'CSAT', 'NPS', 'Mês'],
-        rows: lista.map(r => [r.nome || '—', celN2(r.csat), celN2(r.nps), r.m != null ? MESES[r.m] + '/' + String(r.y).slice(2) : '—']),
-        rodape: [lista.length + ' respostas', celN2(media(lista.map(r => r.csat))), celN2(media(lista.map(r => r.nps))), '']
-      } : { nota: 'Nenhuma resposta no período.' };
-    }
-    case 'expansao':
-      return {
-        cols: ['Componente', 'Valor'],
-        rows: [
-          ['Cross Sell (' + (d.nVendas || 0) + ' vendas)', celR$0(d.cross)],
-          ['Upsell', celR$0(d.up)],
-          ['Down Sell', celR$0(d.down)]
-        ],
-        rodape: ['Expansão de Receita', celR$0(d.exp)]
-      };
-    case 'nrr':
-      return { nota: 'NRR vem calculado do card 2026 do ClickUp (anual ' + (D.geral.nrrAnual ?? '—') + '% · mensal ' + (D.geral.nrrMensal ?? '—') + '%) — sem abertura por cliente.' };
-    default: return { nota: 'Sem detalhamento para esta métrica.' };
-  }
-}
-
-function renderDetalhe(){
-  const mDef = METRICAS.find(x => x.id === state.metric);
-  $('#det-metric').textContent = mDef.label;
-  $('#det-per').textContent = state.periodo === 'acc' ? '· acumulado ' + ANO : '· ' + MESES_FULL[state.periodo] + '/' + ANO;
-  const body = $('#det-body');
-  const det = detalheData();
-  if (!det) { body.innerHTML = '<div class="det-nota">carregando…</div>'; return; }
-  let html = '';
-  if (det.cols) {
-    const cel = (c, ehTh) => {
-      if (typeof c === 'string') return (ehTh ? '<th>' : '<td>') + c + (ehTh ? '</th>' : '</td>');
-      const cls = (c.num ? 'num' : '') + (c.neg ? ' neg' : '');
-      return '<td class="' + cls + '">' + c.t + '</td>';
-    };
-    html += '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
-      det.cols.map((c, i) => '<th class="' + (i > 0 ? 'num' : '') + '">' + c + '</th>').join('') + '</tr></thead><tbody>' +
-      det.rows.map(r => '<tr>' + r.map(c => cel(c)).join('') + '</tr>').join('') + '</tbody>' +
-      (det.rodape ? '<tfoot><tr>' + det.rodape.map((c, i) => typeof c === 'string' ? '<td class="' + (i > 0 ? 'num' : '') + '">' + c + '</td>' : cel(c)).join('') + '</tr></tfoot>' : '') +
-      '</table></div>';
-  }
-  if (det.nota) html += '<div class="det-nota">' + det.nota + '</div>';
-  body.innerHTML = html;
-}
 
 /* ---------------- gráfico ---------------- */
 function serieMetrica(id){
