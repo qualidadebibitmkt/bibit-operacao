@@ -113,6 +113,21 @@
   .tabela tbody tr:hover{background:rgba(94,155,120,.06)}
   .tabela tbody tr:last-child td{border-bottom:0}
   .vazio{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--faint);padding:18px}
+  #modal-bg{position:fixed;inset:0;background:rgba(5,7,5,.74);backdrop-filter:blur(3px);z-index:60;
+    display:grid;place-items:center;padding:22px}
+  #modal-bg[hidden]{display:none}
+  #modal{background:linear-gradient(160deg,var(--card2),var(--card) 62%);border:1px solid rgba(94,155,120,.35);
+    border-radius:18px;max-width:920px;width:100%;max-height:84vh;display:flex;flex-direction:column;
+    padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+  .modal-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .modal-top h2{font-size:16px;font-weight:800}
+  .modal-top h2 em{font-style:normal;color:var(--sage)}
+  #modal-x{background:none;border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;
+    font-size:17px;line-height:1;cursor:pointer;transition:.16s}
+  #modal-x:hover{border-color:var(--clay);color:var(--clay)}
+  #modal #detalhe-corpo{overflow:auto}
+  #modal .tabela-wrap{max-height:none;border:1px solid var(--line)}
+  @media (max-width:640px){#modal{padding:16px;max-height:90vh}}
   .aviso{margin-top:16px;border:1px solid rgba(200,155,118,.35);background:var(--clay-dim);border-radius:12px;
     padding:12px 16px;font-size:13px;color:var(--creme);display:none;line-height:1.55}
   .aviso.on{display:block}
@@ -182,19 +197,21 @@
     </div>
   </section>
 
-  <section class="painel" style="margin-top:18px">
-    <div class="painel-top">
-      <h2 id="detalhe-titulo">Composição</h2>
-      <div class="hint">registros do ClickUp que formam o número do card selecionado</div>
-    </div>
-    <div id="detalhe-corpo"></div>
-  </section>
-
   <footer>
     Métricas de meses passados marcadas com <span class="tag" style="position:static">reconstruído</span> são recalculadas pelas
     datas de entrada e saída dos clientes na Growth — os demais valores vêm dos mesmos campos que alimentam o dashboard do ClickUp.
   </footer>
 </main>
+
+<div id="modal-bg" hidden>
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="detalhe-titulo">
+    <div class="modal-top">
+      <h2 id="detalhe-titulo"></h2>
+      <button id="modal-x" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div id="detalhe-corpo"></div>
+  </div>
+</div>
 
 <script>
 /* =====================================================================
@@ -529,7 +546,7 @@ function renderGrid(){
       '<div class="valor' + (neg ? ' neg' : '') + '">' + valorTxt + '</div>' +
       '<div class="card-foot">' + (d ? deltaChip(mDef, d, ant) : '<span class="delta flat">…</span>') +
       '<span class="sub">' + (sub || '') + '</span></div>';
-    card.onclick = () => { state.metric = mDef.id; renderGrid(); renderChart(); renderDetalhe(); };
+    card.onclick = () => { state.metric = mDef.id; renderGrid(); renderChart(); abrirDetalhe(); };
     card.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.onclick(); } };
     grid.appendChild(card);
   });
@@ -692,10 +709,13 @@ function detalheDados(){
     resumo: 'crossell + upsell − downsell' };
 }
 
+function abrirDetalhe(){ renderDetalhe(); $('#modal-bg').hidden = false; }
+function fecharDetalhe(){ $('#modal-bg').hidden = true; }
+
 function renderDetalhe(){
   const box = $('#detalhe-corpo');
   const mDef = METRICAS.find(x => x.id === state.metric);
-  $('#detalhe-titulo').innerHTML = 'Composição · <em style="font-style:normal;color:var(--sage)">' + mDef.label + '</em> · ' +
+  $('#detalhe-titulo').innerHTML = '<em>' + mDef.label + '</em> · ' +
     (state.periodo === 'acc' ? 'acumulado ' + ANO : MESES_FULL[state.periodo]);
   const det = state.D ? detalheDados() : null;
   if (!det || !det.rows.length) { box.innerHTML = '<div class="vazio">— sem registros no período</div>'; return; }
@@ -706,7 +726,7 @@ function renderDetalhe(){
 }
 
 /* ---------------- ciclo ---------------- */
-function renderTudo(){ renderTitulo(); renderPeriodos(); renderGrid(); renderChart(); renderDetalhe(); }
+function renderTudo(){ renderTitulo(); renderPeriodos(); renderGrid(); renderChart(); }
 
 function computa(D){
   state.D = D;
@@ -741,6 +761,9 @@ async function carrega(){
 }
 
 $('#btn-refresh').onclick = carrega;
+$('#modal-x').onclick = fecharDetalhe;
+$('#modal-bg').addEventListener('click', (e) => { if (e.target === e.currentTarget) fecharDetalhe(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharDetalhe(); });
 window.addEventListener('resize', () => { if (state.D) renderChart(); });
 carrega();
 </script>
