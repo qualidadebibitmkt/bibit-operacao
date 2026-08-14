@@ -347,7 +347,7 @@ function parseTudo(raw){
       nome: t.name,
       status,
       vr: cfNum(t, CF.vr) || 0,
-      entrada: cfNum(t, CF.entrada) || num(t.start_date) || num(t.date_created),
+      entrada: cfNum(t, CF.entrada),
       saida: saidaCampo || (status === 'churn' ? num(t.date_closed) : null),
       ltv: cfNum(t, CF.ltv),
       tmp: cfNum(t, CF.tmp),
@@ -431,7 +431,8 @@ function calcAcumulado(D){
 function calcMes(D, m){
   if (m < MES_INICIO || m > MES_ATUAL) return null;
   const fim = fimMes(m), ini = iniMes(m);
-  const ativos = ativosEm(D, fim);
+  const aoVivo = (m === MES_ATUAL);
+  const ativos = aoVivo ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
   const mrr = soma(ativos.map(c => c.vr));
   const mrrIni = soma(ativosEm(D, ini - 1).map(c => c.vr));
   const chM = churnNoMes(D, m);
@@ -454,7 +455,7 @@ function calcMes(D, m){
     churnRS, churnN: chM.length,
     churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
-    tmpAtivos: media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
+    tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
     exp: (cross != null && up != null && down != null) ? cross + up + down : null,
     nVendas: vd.length
@@ -535,7 +536,7 @@ function renderGrid(){
     const card = document.createElement('div');
     card.className = 'card ' + (mDef.span || '') + (state.metric === mDef.id ? ' sel' : '') + (d ? '' : ' skel');
     card.tabIndex = 0; card.dataset.m = mDef.id;
-    const showRecon = d && state.periodo !== 'acc' && (mDef.recon === true || mDef.recon === 'mes') && v != null;
+    const showRecon = d && state.periodo !== 'acc' && state.periodo !== MES_ATUAL && (mDef.recon === true || mDef.recon === 'mes') && v != null;
     const neg = (v != null && v < 0);
     const valorTxt = (v == null) ? '—'
       : (mDef.brl ? '<span class="pref">R$</span>' + mDef.fmt(v) : mDef.fmt(v) + (mDef.un ? '<span class="un">' + mDef.un + '</span>' : ''));
@@ -637,7 +638,7 @@ function detalheDados(){
   const din2 = v => v == null ? '—' : 'R$ ' + fmtBRL2(v);
   const dataBR = ts => ts ? new Date(ts).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
 
-  const ativos = mes == null ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
+  const ativos = (mes == null || mes === MES_ATUAL) ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
   const tmpDe = c => mes == null
     ? (c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))
     : (c.entrada ? mesesEntre(c.entrada, fim) : null);
