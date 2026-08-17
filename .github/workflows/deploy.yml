@@ -27,6 +27,7 @@ jobs:
           echo "VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ" >> $GITHUB_ENV
 
       - name: Garantir CLICKUP_TOKEN no projeto
+        continue-on-error: true   # guarda de env não pode derrubar o deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
