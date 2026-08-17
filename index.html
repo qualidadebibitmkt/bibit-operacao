@@ -50,7 +50,9 @@
   h1{font-size:27px;font-weight:800;letter-spacing:-.4px}
   h1 small{font-weight:500;color:var(--muted);font-size:15px;margin-left:10px}
 
-  .periodos{display:flex;flex-wrap:wrap;gap:6px}
+  .periodos{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .periodos::-webkit-scrollbar{display:none}
+  .periodos>*{flex:0 0 auto}
   .pill{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;
     padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);
     cursor:pointer;transition:.16s}
@@ -501,6 +503,7 @@ function renderPeriodos(){
   };
   mk('Acumulado', 'acc', false);
   MESES.forEach((mn, i) => mk(mn, i, i < MES_INICIO || i > MES_ATUAL || !state.meses[i]));
+  const s=box.querySelector('.pill.sel'); if(s) box.scrollLeft=Math.max(0,s.offsetLeft-box.clientWidth/2+s.offsetWidth/2);
 }
 
 function renderTitulo(){
