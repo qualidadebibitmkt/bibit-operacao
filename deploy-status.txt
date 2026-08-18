@@ -1,3 +1,4 @@
 diag: {"CLICKUP_TOKEN":"OK"}
 raiz: 200
-data: 2026-08-18T23:56:25Z
+vercel_auth: 200
+data: 2026-08-18T23:58:53Z
