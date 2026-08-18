@@ -11,7 +11,7 @@
 <style>
   :root{
     --bg:#0a0c0a; --card:#141a15; --card2:#1a221b;
-    --sage:#5e9b78; --clay:#c89b76; --creme:#eee7df;
+    --sage:#5e9b78; --clay:#c89b76; --creme:#eee7df; --alerta:#d06a5c;
     --muted:rgba(238,231,223,.55); --faint:rgba(238,231,223,.32);
     --line:rgba(238,231,223,.07); --sage-dim:rgba(94,155,120,.16); --clay-dim:rgba(200,155,118,.16);
     --radius:18px;
@@ -50,9 +50,7 @@
   h1{font-size:27px;font-weight:800;letter-spacing:-.4px}
   h1 small{font-weight:500;color:var(--muted);font-size:15px;margin-left:10px}
 
-  .periodos{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .periodos::-webkit-scrollbar{display:none}
-  .periodos>*{flex:0 0 auto}
+  .periodos{display:flex;flex-wrap:wrap;gap:6px}
   .pill{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;
     padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);
     cursor:pointer;transition:.16s}
@@ -80,6 +78,11 @@
   .valor .pref{font-size:16px;font-weight:700;color:var(--muted);margin-right:7px}
   .s8 .valor{font-size:36px}
   .valor.neg{color:var(--clay)}
+  .valor.ok{color:var(--sage)}
+  .valor.fora{color:var(--alerta)}
+  .metatag{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.6px;color:var(--faint)}
+  .metatag.ok{color:var(--sage)}
+  .metatag.fora{color:var(--alerta)}
   .card-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:20px}
   .delta{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.4px;border-radius:7px;padding:3px 7px}
   .delta.up{color:var(--sage);background:var(--sage-dim)}
@@ -486,6 +489,22 @@ const METRICAS = [
     sub:()=>'crossell + upsell − downsell' }
 ];
 
+/* ---------------- metas ---------------- */
+const METAS = {
+  ticket:   { v: 4500, dir: '>=', label: 'meta R$ 4.500' },
+  nrr:      { v: 100,  dir: '>=', label: 'meta 100%' },
+  prod:     { v: 95,   dir: '>=', label: 'meta 95%' },
+  nps:      { v: 9,    dir: '>=', label: 'meta 9' },
+  csat:     { v: 9,    dir: '>=', label: 'meta 9' },
+  churnPct: { v: 5,    dir: '<=', label: 'meta ≤ 5%' }
+};
+function metaEstado(id, v){
+  const m = METAS[id];
+  if (!m || v == null || !isFinite(v)) return null;
+  const dentro = m.dir === '<=' ? v <= m.v : v >= m.v;
+  return dentro ? 'ok' : 'fora';
+}
+
 /* ---------------- estado + render ---------------- */
 const state = { periodo:'acc', metric:'mrr', D:null, acc:null, meses:[] };
 
@@ -503,7 +522,6 @@ function renderPeriodos(){
   };
   mk('Acumulado', 'acc', false);
   MESES.forEach((mn, i) => mk(mn, i, i < MES_INICIO || i > MES_ATUAL || !state.meses[i]));
-  const s=box.querySelector('.pill.sel'); if(s) box.scrollLeft=Math.max(0,s.offsetLeft-box.clientWidth/2+s.offsetWidth/2);
 }
 
 function renderTitulo(){
@@ -541,13 +559,15 @@ function renderGrid(){
     card.tabIndex = 0; card.dataset.m = mDef.id;
     const showRecon = d && state.periodo !== 'acc' && state.periodo !== MES_ATUAL && (mDef.recon === true || mDef.recon === 'mes') && v != null;
     const neg = (v != null && v < 0);
+    const estado = metaEstado(mDef.id, v);
     const valorTxt = (v == null) ? '—'
       : (mDef.brl ? '<span class="pref">R$</span>' + mDef.fmt(v) : mDef.fmt(v) + (mDef.un ? '<span class="un">' + mDef.un + '</span>' : ''));
-    const sub = (d && mDef.sub) ? mDef.sub(d) : null;
+    let sub = (d && mDef.sub) ? mDef.sub(d) : null;
+    if (METAS[mDef.id]) sub = '<span class="metatag ' + (estado || '') + '">' + METAS[mDef.id].label + '</span>';
     card.innerHTML =
       '<div class="card-top"><span class="label">' + mDef.label + '</span>' +
       (showRecon ? '<span class="tag">reconstruído</span>' : '') + '</div>' +
-      '<div class="valor' + (neg ? ' neg' : '') + '">' + valorTxt + '</div>' +
+      '<div class="valor' + (neg ? ' neg' : '') + (estado ? ' ' + estado : '') + '">' + valorTxt + '</div>' +
       '<div class="card-foot">' + (d ? deltaChip(mDef, d, ant) : '<span class="delta flat">…</span>') +
       '<span class="sub">' + (sub || '') + '</span></div>';
     card.onclick = () => { state.metric = mDef.id; renderGrid(); renderChart(); abrirDetalhe(); };
