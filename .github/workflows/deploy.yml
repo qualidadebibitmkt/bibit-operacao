@@ -26,14 +26,29 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          set -e
-          TEAMS=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "Authorization: Bearer $VERCEL_TOKEN")
-          echo "times:"; echo "$TEAMS" | jq -r '.teams[] | "\(.slug)  \(.id)"'
-          ORG_ID=$(echo "$TEAMS" | jq -r '.teams[] | select(.slug=="bibit-marketing") | .id')
-          if [ -z "$ORG_ID" ] || [ "$ORG_ID" = "null" ]; then ORG_ID=$(echo "$TEAMS" | jq -r '.teams[0].id'); fi
-          echo "ORG_ID escolhido: $ORG_ID"
+          AUTH="Authorization: Bearer $VERCEL_TOKEN"
+          LOG=/tmp/resolve.log
+          TEAMS=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "$AUTH")
+          echo "times: $(echo "$TEAMS" | jq -r '[.teams[]?.slug] | join(",")')" | tee -a $LOG
+          ORG_ID=$(echo "$TEAMS" | jq -r '.teams[]? | select(.slug=="bibit-marketing") | .id')
+          [ -z "$ORG_ID" ] && ORG_ID=$(echo "$TEAMS" | jq -r '.teams[0]?.id // empty')
+          PROJECT_ID=""
+          if [ -n "$ORG_ID" ]; then
+            PROJS=$(curl -s "https://api.vercel.com/v9/projects?teamId=$ORG_ID&search=bibit-operacao" -H "$AUTH")
+            PROJECT_ID=$(echo "$PROJS" | jq -r '.projects[]? | select(.name | test("bibit-operacao")) | .id' | head -n1)
+          fi
+          if [ -z "$PROJECT_ID" ]; then
+            PROJS=$(curl -s "https://api.vercel.com/v9/projects?search=bibit-operacao" -H "$AUTH")
+            PROJECT_ID=$(echo "$PROJS" | jq -r '.projects[]? | select(.name | test("bibit-operacao")) | .id' | head -n1)
+            [ -n "$PROJECT_ID" ] && ORG_ID=$(echo "$PROJS" | jq -r '.projects[0].accountId // empty')
+          fi
+          echo "resolvido: org=$ORG_ID projeto=$PROJECT_ID" | tee -a $LOG
+          if [ -z "$PROJECT_ID" ]; then
+            echo "ERRO: projeto bibit-operacao nao encontrado com este token" | tee -a $LOG
+            exit 1
+          fi
           echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
-          echo "VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ" >> $GITHUB_ENV
+          echo "VERCEL_PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
 
       - name: Garantir CLICKUP_TOKEN no projeto
         continue-on-error: true   # guarda de env não pode derrubar o deploy
@@ -79,7 +94,7 @@ jobs:
           sleep 10
           DIAG=$(curl -s --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?diag=1" || echo "sem resposta")
           RAIZ=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/" || echo "000")
-          printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt; { echo '--- log do deploy (fim) ---'; tail -c 1500 /tmp/deploy.log 2>/dev/null || echo 'sem log'; } >> deploy-status.txt
+          printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt; { echo '--- resolucao ---'; cat /tmp/resolve.log 2>/dev/null || echo 'sem resolucao'; echo '--- log do deploy (fim) ---'; tail -c 1500 /tmp/deploy.log 2>/dev/null || echo 'sem log'; } >> deploy-status.txt
           git config user.name "deploy-bot"; git config user.email "bot@bibit"
           git add deploy-status.txt
           git commit -m "status do deploy [skip ci]" || true
