@@ -1,12 +1,43 @@
 diag: {"CLICKUP_TOKEN":"OK"}
 raiz: 200
 vercel_auth: 200
-data: 2026-08-19T00:10:49Z
+data: 2026-08-19T00:21:46Z
 --- quem ---
 conta: qualidade-1171  |  email: qualidade@bibitmkt.com.br  |  nome: Bibit Marketing
 --- resolucao ---
-times: 
-resolvido: org= projeto=
-ERRO: projeto bibit-operacao nao encontrado com este token
+times: bibit-marketing
+resolvido: org=team_SSWS3HUzlxGBMf5fJZNet6Z7 projeto=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ
 --- log do deploy (fim) ---
-sem log
+ Downloading `production` environment variables for bibit-marketing/qualidadebibitmkt-bibit-operacao
+Downloading
+
+✓ Created         .vercel/.env.production.local file
+
+> Downloading project settings
+Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/project.json [0ms]
+Vercel CLI 59.1.4 (Node.js 22.23.2)
+Retrieving project…
+Deploying bibit-marketing/qualidadebibitmkt-bibit-operacao
+Uploading [--------------------] (0.0B/134.1KB)
+Uploading [=====---------------] (37.8KB/134.1KB)
+Uploading [==========----------] (69.8KB/134.1KB)
+Uploading [===============-----] (101.8KB/134.1KB)
+Uploading [====================] (134.1KB/134.1KB)
+  Inspect         https://vercel.com/bibit-marketing/qualidadebibitmkt-bibit-operacao/7e9im7aAbErPm1RbdpQXWy7qfBRJ
+  Production      https://qualidadebibitmkt-bibit-operacao-ak81f8awp-bibit-marketing.vercel.app
+https://qualidadebibitmkt-bibit-operacao-ak81f8awp-bibit-marketing.vercel.appBuilding…
+Building…
+Running build in Washington, D.C., USA (East) – iad1
+Build machine configuration: 2 cores, 8 GB
+Retrieving list of deployment files...
+Previous build caches not available.
+Downloading 6 deployment files...
+Running "vercel build"
+Vercel CLI 59.1.4
+Build Completed in /vercel/output [79ms]
+Deploying outputs...
+[2K[1A[2K[G  Production      https://qualidadebibitmkt-bibit-operacao-ak81f8awp-bibit-marketing.vercel.app
+Completing…
+▲ Aliased         https://qualidadebibitmkt-bibit-operacao.vercel.app
+
+✓ Ready in 8s
