@@ -69,8 +69,9 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -e
-          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN
-          npx vercel@latest deploy --prod --yes --token=$VERCEL_TOKEN
+          set -o pipefail
+          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN 2>&1 | tee -a /tmp/deploy.log
+          npx vercel@latest deploy --prod --yes --token=$VERCEL_TOKEN 2>&1 | tee -a /tmp/deploy.log
 
       - name: Testar e registrar resultado
         if: always()
@@ -78,7 +79,7 @@ jobs:
           sleep 10
           DIAG=$(curl -s --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?diag=1" || echo "sem resposta")
           RAIZ=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/" || echo "000")
-          printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt
+          printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt; { echo '--- log do deploy (fim) ---'; tail -c 1500 /tmp/deploy.log 2>/dev/null || echo 'sem log'; } >> deploy-status.txt
           git config user.name "deploy-bot"; git config user.email "bot@bibit"
           git add deploy-status.txt
           git commit -m "status do deploy [skip ci]" || true
