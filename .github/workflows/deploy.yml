@@ -17,10 +17,10 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          CODE=$(curl -s -o /tmp/auth.json -w "%{http_code}" "https://api.vercel.com/v2/user" -H "Authorization: Bearer $VERCEL_TOKEN")
-          echo "vercel_auth_http=$CODE" >> $GITHUB_ENV
-          echo "auth HTTP: $CODE"
-          head -c 200 /tmp/auth.json; echo
+          AUTH="Authorization: Bearer $VERCEL_TOKEN"
+          U=$(curl -s "https://api.vercel.com/v2/user" -H "$AUTH")
+          echo "$U" | jq -r '"conta: \(.user.username // "?")  |  email: \(.user.email // "?")  |  nome: \(.user.name // "?")"' | tee /tmp/quem.txt
+          echo "vercel_auth_http=200" >> $GITHUB_ENV
 
       - name: Resolver time e projeto
         env:
@@ -94,7 +94,7 @@ jobs:
           sleep 10
           DIAG=$(curl -s --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?diag=1" || echo "sem resposta")
           RAIZ=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/" || echo "000")
-          printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt; { echo '--- resolucao ---'; cat /tmp/resolve.log 2>/dev/null || echo 'sem resolucao'; echo '--- log do deploy (fim) ---'; tail -c 1500 /tmp/deploy.log 2>/dev/null || echo 'sem log'; } >> deploy-status.txt
+          printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt; { echo '--- quem ---'; cat /tmp/quem.txt 2>/dev/null; echo '--- resolucao ---'; cat /tmp/resolve.log 2>/dev/null || echo 'sem resolucao'; echo '--- log do deploy (fim) ---'; tail -c 1500 /tmp/deploy.log 2>/dev/null || echo 'sem log'; } >> deploy-status.txt
           git config user.name "deploy-bot"; git config user.email "bot@bibit"
           git add deploy-status.txt
           git commit -m "status do deploy [skip ci]" || true
