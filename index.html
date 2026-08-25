@@ -326,7 +326,8 @@ const negDown = (x) => x == null ? null : (x === 0 ? 0 : -Math.abs(x));  // down
 
 /* ---------------- fetch ---------------- */
 async function fetchJSON(path){
-  const r = await fetch(API + encodeURIComponent(path));
+  const bust = state.bust ? '&b=' + state.bust : '';
+  const r = await fetch(API + encodeURIComponent(path) + bust);
   if (!r.ok) throw new Error('HTTP ' + r.status + ' em ' + path);
   return r.json();
 }
@@ -547,7 +548,7 @@ function metaEstado(id, v){
 }
 
 /* ---------------- estado + render ---------------- */
-const state = { periodo:'acc', metric:'mrr', D:null, acc:null, meses:[] };
+const state = { periodo:'acc', metric:'mrr', D:null, acc:null, meses:[], bust:0 };
 
 function dadosPeriodo(){ return state.periodo === 'acc' ? state.acc : state.meses[state.periodo]; }
 function dadosAnterior(){ return (state.periodo === 'acc' || state.periodo <= MES_INICIO) ? null : state.meses[state.periodo - 1]; }
@@ -832,7 +833,7 @@ async function carrega(){
   }
 }
 
-$('#btn-refresh').onclick = carrega;
+$('#btn-refresh').onclick = () => { state.bust = Date.now(); carrega(); };
 $('#modal-x').onclick = fecharDetalhe;
 $('#modal-bg').addEventListener('click', (e) => { if (e.target === e.currentTarget) fecharDetalhe(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharDetalhe(); });
