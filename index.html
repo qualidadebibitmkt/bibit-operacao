@@ -251,6 +251,7 @@ const CF = {
   // Cross-Sell (vendas)
   valorVenda: '01454349-1cb6-4e8a-a665-7d7e74420d64',
   dataPag:    '435d3c37-e413-4362-9c21-bdba5b6473d0',
+  dataVenc:   'a0ec5592-69e2-4f04-b391-770657a99ca5',
   // CSAT - Envios
   csatTraf:  'be7c4a7a-7781-456c-b151-248507fb1f5e',
   csatSM:    '8e179fe1-98ef-4237-b617-2f9123a78f17',
@@ -373,7 +374,7 @@ function parseTudo(raw){
   };
   const foiPago = (t) => normaliza(t.status && t.status.status || t.status).includes('recebido');
   const valorItem = (t) => { const v = cfNum(t, CF.valorVenda); return (v != null && v > 0) ? v : (valorDoNome(t.name) || 0); };
-  const tsPagamento = (t) => cfNum(t, CF.dataPag) || num(t.date_closed) || num(t.due_date) || num(t.date_created);
+  const tsPagamento = (t) => cfNum(t, CF.dataPag) || cfNum(t, CF.dataVenc) || num(t.due_date) || num(t.date_closed) || num(t.date_created);
 
   const pais = raw.vendas.filter(t => !t.parent);
   const filhos = raw.vendas.filter(t => t.parent);
@@ -386,9 +387,12 @@ function parseTudo(raw){
     const d = ts ? new Date(ts) : null;
     let pago = 0;
     if (parcelas.length) {
+      const semValor = parcelas.filter(f => !valorItem(f)).length;
+      const declarado = soma(parcelas.map(valorItem));
+      const rateio = (semValor && valorPai > valorPai - declarado) ? Math.max(0, (valorPai - declarado)) / semValor : 0;
       for (const f of parcelas) {
         if (!foiPago(f)) continue;
-        const v = valorItem(f);
+        const v = valorItem(f) || rateio;
         if (!v) continue;
         pago += v;
         const pts = tsPagamento(f), pd = pts ? new Date(pts) : null;
