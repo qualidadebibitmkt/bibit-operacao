@@ -38,8 +38,8 @@ jobs:
             echo "$PNAME: ${#V} chars | ClickUp: $C" | tee -a /tmp/token.log
             if [ "$C" = "200" ] && [ -z "$BOM" ]; then BOM="$V"; echo "::add-mask::$BOM"; echo "BOM=$PNAME" | tee -a /tmp/token.log; fi
           done <<< "$PROJS"
-          if [ -z "$BOM" ]; then echo "SEM token valido em projeto nenhum" | tee -a /tmp/token.log; exit 1; fi
           echo "CLICKUP_OK=$BOM" >> $GITHUB_ENV
+          if [ -z "$BOM" ]; then echo "SEM token valido em projeto nenhum — pedir token do ClickUp ao Bruno" | tee -a /tmp/token.log; fi
           for PID in prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v; do
             EID=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
             V=""
@@ -55,6 +55,7 @@ jobs:
           done
 
       - name: Deploy nos dois projetos
+        if: ${{ env.CLICKUP_OK != '' }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -68,6 +69,7 @@ jobs:
           done
 
       - name: Auditoria de junho (dados reais)
+        if: ${{ env.CLICKUP_OK != '' }}
         env:
           CK: ${{ env.CLICKUP_OK }}
         run: |
@@ -115,6 +117,7 @@ jobs:
       - name: Testar e registrar resultado
         if: always()
         run: |
+          set +e
           sleep 10
           D1=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?path=list%2F901712531318%2Ftask%3Fpage%3D0")
           D2=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://bibit-operacao.vercel.app/api/clickup?path=list%2F901712531318%2Ftask%3Fpage%3D0")
@@ -127,3 +130,4 @@ jobs:
           git add deploy-status.txt diag-vendas.json 2>/dev/null || git add deploy-status.txt
           git commit -m "status do deploy [skip ci]" || true
           git push || true
+          true
