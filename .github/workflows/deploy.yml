@@ -22,40 +22,24 @@ jobs:
           echo "org: $ORG_ID" | tee /tmp/token.log
           echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
 
-      - name: Token ClickUp valido nos dois projetos
+      - name: Gravar CLICKUP_TOKEN validado nos dois projetos
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CK: ${{ secrets.CLICKUP_PK }}
         run: |
           AUTH="Authorization: Bearer $VERCEL_TOKEN"
-          testa() { curl -s -o /dev/null -w "%{http_code}" "https://api.clickup.com/api/v2/list/901712531318/task?page=0" -H "Authorization: $1"; }
-          BOM=""
-          PROJS=$(curl -s "https://api.vercel.com/v9/projects?teamId=$VERCEL_ORG_ID&limit=100" -H "$AUTH" | jq -r '.projects[] | "\(.id) \(.name)"')
-          while read -r PID PNAME; do
-            EID=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
-            [ -z "$EID" ] || [ "$EID" = "null" ] && continue
-            V=$(curl -s "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$VERCEL_ORG_ID&decrypt=true" -H "$AUTH" | jq -r '.value // empty')
-            C=$(testa "$V")
-            echo "$PNAME: ${#V} chars | ClickUp: $C" | tee -a /tmp/token.log
-            if [ "$C" = "200" ] && [ -z "$BOM" ]; then BOM="$V"; echo "::add-mask::$BOM"; echo "BOM=$PNAME" | tee -a /tmp/token.log; fi
-          done <<< "$PROJS"
-          echo "CLICKUP_OK=$BOM" >> $GITHUB_ENV
-          if [ -z "$BOM" ]; then echo "SEM token valido em projeto nenhum — pedir token do ClickUp ao Bruno" | tee -a /tmp/token.log; fi
+          C=$(curl -s -o /dev/null -w "%{http_code}" "https://api.clickup.com/api/v2/list/901712531318/task?page=0" -H "Authorization: $CK")
+          echo "teste do token recebido no ClickUp: $C" | tee -a /tmp/token.log
+          if [ "$C" != "200" ]; then echo "TOKEN INVALIDO — abortando sem tocar em nada" | tee -a /tmp/token.log; exit 1; fi
           for PID in prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v; do
             EID=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
-            V=""
-            [ -n "$EID" ] && [ "$EID" != "null" ] && V=$(curl -s "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$VERCEL_ORG_ID&decrypt=true" -H "$AUTH" | jq -r '.value // empty')
-            if [ "$(testa "$V")" != "200" ]; then
-              [ -n "$EID" ] && [ "$EID" != "null" ] && curl -s -X DELETE "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$VERCEL_ORG_ID" -H "$AUTH" > /dev/null
-              curl -s -X POST "https://api.vercel.com/v10/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" -H "Content-Type: application/json" \
-                -d "{\"key\":\"CLICKUP_TOKEN\",\"value\":\"$BOM\",\"type\":\"encrypted\",\"target\":[\"production\",\"preview\",\"development\"]}" > /dev/null
-              echo "env corrigida em $PID" | tee -a /tmp/token.log
-            else
-              echo "env ja valida em $PID" | tee -a /tmp/token.log
-            fi
+            [ -n "$EID" ] && [ "$EID" != "null" ] && curl -s -X DELETE "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$VERCEL_ORG_ID" -H "$AUTH" > /dev/null
+            R=$(curl -s -X POST "https://api.vercel.com/v10/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" -H "Content-Type: application/json" \
+              -d "{\"key\":\"CLICKUP_TOKEN\",\"value\":\"$CK\",\"type\":\"encrypted\",\"target\":[\"production\",\"preview\",\"development\"]}")
+            echo "$PID: $(echo "$R" | jq -r 'if .created then "env gravada" else (.error.message // "erro") end')" | tee -a /tmp/token.log
           done
 
       - name: Deploy nos dois projetos
-        if: ${{ env.CLICKUP_OK != '' }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -63,27 +47,24 @@ jobs:
           for PID in prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v; do
             rm -rf .vercel
             export VERCEL_PROJECT_ID=$PID
-            echo "== deploy $PID ==" | tee -a /tmp/deploy.log
-            npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN 2>&1 | tail -n 2 | tee -a /tmp/deploy.log
-            npx vercel@latest deploy --prod --yes --token=$VERCEL_TOKEN 2>&1 | tail -n 4 | tee -a /tmp/deploy.log
+            echo "== $PID ==" | tee -a /tmp/deploy.log
+            npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN 2>&1 | tail -n 1 | tee -a /tmp/deploy.log
+            npx vercel@latest deploy --prod --yes --token=$VERCEL_TOKEN 2>&1 | grep -E "Aliased|Production|Error" | tee -a /tmp/deploy.log
           done
 
       - name: Auditoria de junho (dados reais)
-        if: ${{ env.CLICKUP_OK != '' }}
         env:
-          CK: ${{ env.CLICKUP_OK }}
+          CK: ${{ secrets.CLICKUP_PK }}
         run: |
           python3 - << 'PY'
           import json, urllib.request, os, datetime, re
-          tk = os.environ.get('CK','')
+          tk = os.environ['CK']
           def get(u):
-              r = urllib.request.Request(u, headers={'Authorization': tk})
-              return json.loads(urllib.request.urlopen(r).read())
+              return json.loads(urllib.request.urlopen(urllib.request.Request(u, headers={'Authorization': tk})).read())
           tasks, page = [], 0
           while True:
               j = get(f'https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true&page={page}')
-              t = j.get('tasks', [])
-              tasks += t
+              t = j.get('tasks', []); tasks += t
               if len(t) < 100: break
               page += 1
           VV='01454349-1cb6-4e8a-a665-7d7e74420d64'; DP='435d3c37-e413-4362-9c21-bdba5b6473d0'
@@ -94,38 +75,37 @@ jobs:
               m=re.search(r'R\$\s*([\d\.]+(?:,\d{1,2})?)', n or '')
               return float(m.group(1).replace('.','').replace(',','.')) if m else None
           filhos=[t for t in tasks if t.get('parent')]
-          temfilho=lambda t: any(f.get('parent')==t['id'] for f in filhos)
           linhas=[]
           for t in tasks:
               if 'recebido' not in (t.get('status') or {}).get('status','').lower(): continue
-              if not t.get('parent') and temfilho(t): continue
+              if not t.get('parent') and any(f.get('parent')==t['id'] for f in filhos): continue
               ts = cf(t,DP) or t.get('date_closed')
               if not ts: continue
               d = datetime.datetime.utcfromtimestamp(int(ts)/1000)
               v = cf(t,VV)
               v = float(v) if v not in (None,'') else (vnome(t['name']) or 0)
-              linhas.append({'nome':t['name'],'valor':v,'mes':f'{d.month:02d}/{d.year}','data':d.strftime('%d/%m')})
-          out={'geradoEm':datetime.datetime.utcnow().isoformat(),'total':len(linhas),'linhas':linhas}
-          json.dump(out, open('diag-vendas.json','w'), ensure_ascii=False, indent=1)
-          jun=[l for l in linhas if l['mes']=='06/2026']
+              linhas.append({'nome':t['name'],'valor':v,'mes':f'{d.month:02d}/{d.year}','data':d.strftime('%d/%m/%y')})
+          json.dump({'geradoEm':datetime.datetime.utcnow().isoformat(),'linhas':linhas}, open('diag-vendas.json','w'), ensure_ascii=False, indent=1)
           with open('/tmp/junho.txt','w') as f:
-              f.write(f"JUNHO: {len(jun)} pagamentos, R$ {sum(l['valor'] for l in jun):,.2f}\n")
-              for l in jun: f.write(f"  {l['nome'][:60]} | R$ {l['valor']:,.2f} | {l['data']}\n")
+              for mes in ['05/2026','06/2026','07/2026','08/2026']:
+                  L=[l for l in linhas if l['mes']==mes]
+                  f.write(f"{mes}: {len(L)} pagamentos = R$ {sum(x['valor'] for x in L):,.2f}\n")
+                  if mes=='06/2026':
+                      for l in L: f.write(f"   {l['nome'][:58]} | R$ {l['valor']:,.2f} | {l['data']}\n")
           print(open('/tmp/junho.txt').read())
           PY
 
-      - name: Testar e registrar resultado
+      - name: Registrar resultado
         if: always()
         run: |
           set +e
           sleep 10
           D1=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?path=list%2F901712531318%2Ftask%3Fpage%3D0")
           D2=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://bibit-operacao.vercel.app/api/clickup?path=list%2F901712531318%2Ftask%3Fpage%3D0")
-          { printf 'proxy qualidadebibitmkt-bibit-operacao: %s\nproxy bibit-operacao: %s\ndata: %s\n' "$D1" "$D2" "$(date -u +%FT%TZ)";
+          { printf 'proxy principal: %s\nproxy duplicado: %s\ndata: %s\n' "$D1" "$D2" "$(date -u +%FT%TZ)";
             echo '--- token ---'; cat /tmp/token.log 2>/dev/null;
-            echo '--- junho ---'; cat /tmp/junho.txt 2>/dev/null || echo 'auditoria nao rodou';
+            echo '--- meses ---'; cat /tmp/junho.txt 2>/dev/null || echo 'auditoria nao rodou';
             echo '--- deploys ---'; cat /tmp/deploy.log 2>/dev/null; } > deploy-status.txt
-          cat deploy-status.txt
           git config user.name "deploy-bot"; git config user.email "bot@bibit"
           git add deploy-status.txt diag-vendas.json 2>/dev/null || git add deploy-status.txt
           git commit -m "status do deploy [skip ci]" || true
