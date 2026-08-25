@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bibit · Operação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- DEMO_SLOT -->
+<style>
+  :root{
+    --bg:#0a0c0a; --card:#141a15; --card2:#1a221b;
+    --sage:#5e9b78; --clay:#c89b76; --creme:#eee7df; --alerta:#d06a5c;
+    --muted:rgba(238,231,223,.55); --faint:rgba(238,231,223,.32);
+    --line:rgba(238,231,223,.07); --sage-dim:rgba(94,155,120,.16); --clay-dim:rgba(200,155,118,.16);
+    --radius:18px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scrollbar-color:var(--card2) var(--bg)}
+  body{background:var(--bg);color:var(--creme);font-family:'Manrope',sans-serif;min-height:100vh;display:flex}
+  ::selection{background:var(--sage);color:#0a0c0a}
+  .mono{font-family:'Spline Sans Mono',monospace}
+
+  /* ---------- sidebar ---------- */
+  aside{width:228px;min-height:100vh;padding:28px 22px;border-right:1px solid var(--line);
+    display:flex;flex-direction:column;gap:26px;position:sticky;top:0;align-self:flex-start;
+    background:linear-gradient(180deg,rgba(20,26,21,.5),rgba(10,12,10,0))}
+  .brand{display:block}
+  .brand img{width:100%;max-width:158px;height:auto;display:block}
+  nav{display:flex;flex-direction:column;gap:6px}
+  .nav-label{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:2.2px;color:var(--faint);text-transform:uppercase;margin-bottom:4px}
+  .nav-item{padding:9px 12px;border-radius:10px;font-size:13px;font-weight:700;color:var(--muted);cursor:default}
+  .nav-item.ativo{background:var(--sage-dim);color:var(--creme);border:1px solid rgba(94,155,120,.28)}
+  .side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+  .demo-flag{display:none;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:1.6px;color:var(--clay);
+    border:1px dashed rgba(200,155,118,.45);border-radius:8px;padding:7px 10px;text-align:center}
+  body.demo .demo-flag{display:block}
+  .sync{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--faint);letter-spacing:.6px;line-height:1.7}
+  .sync b{color:var(--muted);font-weight:500}
+  .btn-refresh{background:var(--card);border:1px solid var(--line);color:var(--creme);border-radius:10px;
+    padding:9px 12px;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:1px;cursor:pointer;transition:.18s}
+  .btn-refresh:hover{border-color:var(--sage);color:var(--sage)}
+  .btn-refresh:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+
+  /* ---------- main ---------- */
+  main{flex:1;padding:30px 34px 60px;max-width:1460px}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:24px}
+  .eyebrow{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:2.6px;color:var(--sage);text-transform:uppercase;margin-bottom:8px}
+  h1{font-size:27px;font-weight:800;letter-spacing:-.4px}
+  h1 small{font-weight:500;color:var(--muted);font-size:15px;margin-left:10px}
+
+  .periodos{display:flex;flex-wrap:wrap;gap:6px}
+  .pill{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted);
+    cursor:pointer;transition:.16s}
+  .pill:hover:not(:disabled){border-color:var(--sage);color:var(--creme)}
+  .pill.sel{background:var(--sage);border-color:var(--sage);color:#0a0c0a;font-weight:500}
+  .pill:disabled{opacity:.28;cursor:not-allowed}
+  .pill:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+
+  /* ---------- grid ---------- */
+  .grid{display:grid;grid-template-columns:repeat(20,1fr);gap:14px}
+  .card{grid-column:span 4;background:linear-gradient(160deg,var(--card2),var(--card) 62%);
+    border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px 16px;min-height:128px;
+    display:flex;flex-direction:column;justify-content:space-between;gap:8px;cursor:pointer;
+    box-shadow:0 10px 26px rgba(0,0,0,.28);transition:border-color .18s, transform .18s}
+  .card:hover{border-color:rgba(94,155,120,.4)}
+  .card.sel{border-color:var(--sage);box-shadow:0 10px 30px rgba(94,155,120,.14)}
+  .card:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
+  .s5{grid-column:span 5}.s8{grid-column:span 8}
+  .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .label{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted)}
+  .tag{font-family:'Spline Sans Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--clay);
+    border:1px solid rgba(200,155,118,.35);border-radius:6px;padding:2px 6px;text-transform:uppercase;white-space:nowrap}
+  .valor{font-size:30px;font-weight:800;letter-spacing:-.6px;line-height:1.05;font-variant-numeric:tabular-nums}
+  .valor .un{font-size:15px;font-weight:700;color:var(--muted);margin-left:5px}
+  .valor .pref{font-size:16px;font-weight:700;color:var(--muted);margin-right:7px}
+  .s8 .valor{font-size:36px}
+  .valor.neg{color:var(--clay)}
+  .valor.ok{color:var(--sage)}
+  .valor.fora{color:var(--alerta)}
+  .metatag{font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.6px;color:var(--faint)}
+  .metatag.ok{color:var(--sage)}
+  .metatag.fora{color:var(--alerta)}
+  .card-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:20px}
+  .delta{font-family:'Spline Sans Mono',monospace;font-size:10.5px;letter-spacing:.4px;border-radius:7px;padding:3px 7px}
+  .delta.up{color:var(--sage);background:var(--sage-dim)}
+  .delta.down{color:var(--clay);background:var(--clay-dim)}
+  .delta.flat{color:var(--faint);background:rgba(238,231,223,.05)}
+  .sub{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--faint);letter-spacing:.4px;text-align:right}
+
+  .skel .valor,.skel .delta,.skel .sub{color:transparent!important;background:linear-gradient(90deg,var(--card2) 25%,#222c24 50%,var(--card2) 75%);
+    background-size:200% 100%;animation:sh 1.2s infinite;border-radius:8px}
+  @keyframes sh{to{background-position:-200% 0}}
+  @media (prefers-reduced-motion:reduce){.skel .valor,.skel .delta,.skel .sub{animation:none}}
+
+  /* ---------- evolução ---------- */
+  .painel{margin-top:26px;background:linear-gradient(160deg,var(--card2),var(--card) 62%);
+    border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px;box-shadow:0 10px 26px rgba(0,0,0,.28)}
+  .painel-top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:16px}
+  .painel-top h2{font-size:15px;font-weight:800;letter-spacing:.2px}
+  .painel-top h2 em{font-style:normal;color:var(--sage)}
+  .painel-top .hint{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--faint);letter-spacing:.6px}
+  #chart-wrap{position:relative}
+  #chart{width:100%;height:230px;display:block}
+  #tip{position:absolute;pointer-events:none;background:#0e120f;border:1px solid var(--line);border-radius:10px;
+    padding:8px 11px;font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--creme);display:none;
+    transform:translate(-50%,-115%);white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+  #tip b{color:var(--sage);font-weight:500}
+
+  .resumo-det{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.5px;margin-bottom:12px}
+  .tabela-wrap{max-height:400px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+  .tabela{width:100%;border-collapse:collapse;font-size:13px}
+  .tabela th{position:sticky;top:0;background:#10150f;font-family:'Spline Sans Mono',monospace;font-size:9.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--faint);padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);z-index:1}
+  .tabela th.num,.tabela td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tabela td{padding:9px 14px;border-bottom:1px solid rgba(238,231,223,.04);color:var(--creme)}
+  .tabela tbody tr:hover{background:rgba(94,155,120,.06)}
+  .tabela tbody tr:last-child td{border-bottom:0}
+  .vazio{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--faint);padding:18px}
+  #modal-bg{position:fixed;inset:0;background:rgba(5,7,5,.74);backdrop-filter:blur(3px);z-index:60;
+    display:grid;place-items:center;padding:22px}
+  #modal-bg[hidden]{display:none}
+  #modal{background:linear-gradient(160deg,var(--card2),var(--card) 62%);border:1px solid rgba(94,155,120,.35);
+    border-radius:18px;max-width:920px;width:100%;max-height:84vh;display:flex;flex-direction:column;
+    padding:20px 22px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+  .modal-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .modal-top h2{font-size:16px;font-weight:800}
+  .modal-top h2 em{font-style:normal;color:var(--sage)}
+  #modal-x{background:none;border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;
+    font-size:17px;line-height:1;cursor:pointer;transition:.16s}
+  #modal-x:hover{border-color:var(--clay);color:var(--clay)}
+  #modal #detalhe-corpo{overflow:auto}
+  #modal .tabela-wrap{max-height:none;border:1px solid var(--line)}
+  @media (max-width:640px){#modal{padding:16px;max-height:90vh}}
+  .aviso{margin-top:16px;border:1px solid rgba(200,155,118,.35);background:var(--clay-dim);border-radius:12px;
+    padding:12px 16px;font-size:13px;color:var(--creme);display:none;line-height:1.55}
+  .aviso.on{display:block}
+  .aviso button{margin-left:10px;background:none;border:1px solid var(--clay);color:var(--clay);border-radius:8px;
+    padding:4px 10px;font-family:'Spline Sans Mono',monospace;font-size:10px;cursor:pointer}
+
+  footer{margin-top:34px;font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--faint);letter-spacing:.8px;line-height:1.9}
+
+  /* ---------- responsivo ---------- */
+  @media (max-width:1180px){
+    .card,.s5,.s8{grid-column:span 10}
+    .grid{grid-template-columns:repeat(20,1fr)}
+  }
+  @media (max-width:880px){
+    body{flex-direction:column}
+    aside{width:100%;min-height:0;position:static;flex-direction:row;align-items:center;padding:16px 20px;border-right:0;border-bottom:1px solid var(--line)}
+    nav,.side-foot .sync{display:none}
+    .brand img{max-width:112px}
+    .side-foot{margin:0 0 0 auto;flex-direction:row;align-items:center}
+    main{padding:22px 18px 50px}
+  }
+  @media (max-width:640px){
+    .card,.s5,.s8{grid-column:span 20}
+    .valor{font-size:28px}
+    h1{font-size:22px}
+  }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <img src="data:image/png;base64,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" alt="Bibit — Marketing de Bebidas" />
+  </div>
+  <nav>
+    <div class="nav-label">Painéis</div>
+    <div class="nav-item ativo">Operação</div>
+  </nav>
+  <div class="side-foot">
+    <div class="demo-flag">demo · dados de exemplo</div>
+    <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b></div>
+  </div>
+</aside>
+
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">Bibit Marketing · Operação</div>
+      <h1 id="titulo">Acumulado <small id="titulo-sub">2026</small></h1>
+    </div>
+    <div class="periodos" id="periodos" role="tablist" aria-label="Período"></div>
+  </header>
+
+  <div class="aviso" id="aviso"></div>
+
+  <section class="grid" id="grid" aria-live="polite"></section>
+
+  <section class="painel">
+    <div class="painel-top">
+      <h2>Evolução mensal · <em id="chart-metric">MRR</em></h2>
+      <div class="hint">clique em um card para trocar a métrica · passe o mouse nos pontos</div>
+    </div>
+    <div id="chart-wrap">
+      <svg id="chart" preserveAspectRatio="none" aria-label="Gráfico de evolução mensal"></svg>
+      <div id="tip"></div>
+    </div>
+  </section>
+
+  <footer>
+    Métricas de meses passados marcadas com <span class="tag" style="position:static">reconstruído</span> são recalculadas pelas
+    datas de entrada e saída dos clientes na Growth — os demais valores vêm dos mesmos campos que alimentam o dashboard do ClickUp.
+  </footer>
+</main>
+
+<div id="modal-bg" hidden>
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="detalhe-titulo">
+    <div class="modal-top">
+      <h2 id="detalhe-titulo"></h2>
+      <button id="modal-x" type="button" aria-label="Fechar">×</button>
+    </div>
+    <div id="detalhe-corpo"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   BIBIT · OPERAÇÃO — mesmas informações do "DASHBOARD OPERAÇÃO - ACUMULADO"
+   do ClickUp, com seletor de período (acumulado + mês a mês).
+   ===================================================================== */
+
+const API = '/api/clickup?path=';
+const ANO = 2026;
+const MES_INICIO = 4; // histórico real começa em mai/2026 (índice 4)
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const MESES_FULL = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+const LISTA = {
+  growth:   '901712531318',
+  vendas:   '901713519081',
+  csat:     '901713333681',
+  ranking:  '901713545639'
+};
+const CARD_2026 = '86e1fwefa';
+
+const CF = {
+  // Growth (clientes)
+  vr:      '65f9eee2-b80d-4a6b-959f-61395ae91b02',
+  entrada: 'db1abd50-bc00-4097-92b9-ec639fbe3b04',
+  saida:   'b969da4a-8bae-4f4c-9f8b-2919620a98e0',
+  ltv:     '0da302e9-b65c-4453-84b8-07bbec61ab62',
+  tmp:     '6e1ab131-d931-4f9f-a135-af8051d8fc13',
+  cCross:  'f698066f-80c2-4967-b81b-22fa29fc6c6b',
+  cUp:     'b087f4f3-25ac-4445-a315-f47f55339f33',
+  cDown:   '81c8e707-1e39-4ad0-b9d6-76d25535d611',
+  // Cross-Sell (vendas)
+  valorVenda: '01454349-1cb6-4e8a-a665-7d7e74420d64',
+  dataPag:    '435d3c37-e413-4362-9c21-bdba5b6473d0',
+  dataVenc:   'a0ec5592-69e2-4f04-b391-770657a99ca5',
+  // CSAT - Envios
+  csatTraf:  'be7c4a7a-7781-456c-b151-248507fb1f5e',
+  csatSM:    '8e179fe1-98ef-4237-b617-2f9123a78f17',
+  csatRP:    '465fa81c-df60-48cb-8cab-a2aa33f1a2fc',
+  csatVideo: '5214a872-383d-4a0b-bc6d-088c5a86bbc1',
+  npsGeral:  '93264d0a-8fe6-429a-b8e8-1366e21fcf55',
+  mesAno:    '2a8be0f5-771a-4171-86af-c2a094bde38c',
+  // Ranking (por colaborador/mês)
+  tarTot:  '3d9a9019-b6e7-44e5-9c11-3151138c956a',
+  tarAtr:  'daf6f735-e7e3-4bed-bdc4-32a13ab4dc73',
+  upMes:   'e74909ad-8922-4bbf-a73c-159f04a8de45',
+  downMes: 'a2c17dd9-f8cb-4aba-a34b-90749273d82a',
+  // Card 2026
+  prodAnual:  '6f55aaa9-4bf9-495e-ba06-801a4ea6749a',
+  nrrAnual:   '891c9f54-d485-49fb-9e7e-0c873f044f27',
+  nrrMensal:  '6209c835-05b6-463c-af50-0525e3808285',
+  mrrAcum:    '606530af-374c-4e43-a6c5-eb00af6596df',
+  mrrAtual:   'd03b8a44-53f3-4074-99e5-b201652ec315',
+  expDash:    'aac533e2-c67d-4c5d-9b34-6ba50e50687f',
+  expMes:     '009008a9-e04f-4b15-b709-ebe2bb273bbc',
+  somaDown:   '9e92c006-5bfe-411e-82b0-bad30a44a8ff',
+  somaUp:     '998e1e49-18df-4214-84b4-eac4f29e8553',
+  churnPctAnual: 'c41d2f88-da53-4f7a-aa7f-74e49e723927'
+};
+
+const ATIVOS_STATUS = ['execução','execucao','atrasado'];
+
+/* ---------------- helpers ---------------- */
+const $ = (s) => document.querySelector(s);
+const num = (v) => { const n = parseFloat(String(v ?? '').replace(',', '.')); return isFinite(n) ? n : null; };
+const cfVal = (task, id) => { const f = (task.custom_fields || []).find(c => c.id === id); return f ? f.value : null; };
+const cfNum = (task, id) => num(cfVal(task, id));
+const fimMes = (m) => new Date(ANO, m + 1, 0, 23, 59, 59).getTime();
+const iniMes = (m) => new Date(ANO, m, 1).getTime();
+const hoje = new Date();
+const MES_ATUAL = (hoje.getFullYear() === ANO) ? hoje.getMonth() : 11;
+
+const fmtBRL0 = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+const fmtBRL2 = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt2    = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtInt  = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+
+function normaliza(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
+function parseMesAno(txt, fallbackTs){
+  const t = normaliza(txt);
+  let m = null, y = null, mm;
+  if ((mm = t.match(/(\d{1,2})\s*[\/\-\.]\s*(\d{4})/))) { m = parseInt(mm[1], 10) - 1; y = parseInt(mm[2], 10); }
+  else {
+    for (let i = 0; i < 12; i++) if (t.includes(normaliza(MESES_FULL[i])) || t.match(new RegExp('\\b' + MESES[i] + '\\b'))) { m = i; break; }
+    const ym = t.match(/20\d{2}/); if (ym) y = parseInt(ym[0], 10);
+  }
+  if (m == null || y == null) {
+    if (!fallbackTs) return null;
+    const d = new Date(Number(fallbackTs)); m = d.getMonth(); y = d.getFullYear();
+  }
+  return (m >= 0 && m <= 11) ? { m, y } : null;
+}
+
+function mesDoCardRanking(task){
+  const t = normaliza(task.name);
+  for (let i = 0; i < 12; i++) if (t.includes(normaliza(MESES_FULL[i]))) {
+    const ym = t.match(/20\d{2}/); return { m: i, y: ym ? parseInt(ym[0], 10) : ANO };
+  }
+  const d = new Date(Number(task.date_created)); return { m: d.getMonth(), y: d.getFullYear() };
+}
+
+const media = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const soma  = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) : 0; };
+const mesesEntre = (a, b) => (b - a) / (1000 * 60 * 60 * 24 * 30.44);
+const negDown = (x) => x == null ? null : (x === 0 ? 0 : -Math.abs(x));  // downsell é sempre subtração
+
+/* ---------------- fetch ---------------- */
+async function fetchJSON(path){
+  const bust = state.bust ? '&b=' + state.bust : '';
+  const r = await fetch(API + encodeURIComponent(path) + bust);
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' em ' + path);
+  return r.json();
+}
+async function fetchTasks(listId, incluirSub){
+  let page = 0, out = [];
+  const sub = incluirSub ? 'true' : 'false';
+  while (true) {
+    const j = await fetchJSON(`list/${listId}/task?include_closed=true&subtasks=${sub}&page=${page}`);
+    const t = j.tasks || [];
+    out = out.concat(t);
+    if (t.length < 100) break;
+    page++;
+    if (page > 20) break;
+  }
+  return out;
+}
+
+/* ---------------- parse ---------------- */
+function parseTudo(raw){
+  const clientes = raw.growth.map(t => {
+    const saidaCampo = cfNum(t, CF.saida);
+    const status = normaliza(t.status && t.status.status || t.status);
+    return {
+      nome: t.name,
+      status,
+      vr: cfNum(t, CF.vr) || 0,
+      entrada: cfNum(t, CF.entrada),
+      saida: saidaCampo || (status === 'churn' ? num(t.date_closed) : null),
+      ltv: cfNum(t, CF.ltv),
+      tmp: cfNum(t, CF.tmp),
+      cross: cfNum(t, CF.cCross) || 0,
+      up: cfNum(t, CF.cUp) || 0,
+      down: cfNum(t, CF.cDown) || 0
+    };
+  });
+
+  // Vendas por família: o card-pai carrega o total CONTRATADO; se o pai não tem valor,
+  // a venda é a soma das parcelas. Nunca conta pai + parcela em dobro.
+  // Pagamentos (regime de caixa): parcela com status "recebido" entra no mês em que foi paga
+  // (Data do pagamento → data de fechamento). Venda sem parcelas e recebida = pago integral.
+  const valorDoNome = (nome) => {
+    const mm = String(nome || '').match(/R\$\s*([\d\.]+(?:,\d{1,2})?)/i);
+    if (!mm) return null;
+    return num(mm[1].replace(/\./g, '').replace(',', '.'));
+  };
+  const foiPago = (t) => normaliza(t.status && t.status.status || t.status).includes('recebido');
+  const valorItem = (t) => { const v = cfNum(t, CF.valorVenda); return (v != null && v > 0) ? v : (valorDoNome(t.name) || 0); };
+  // regra do financeiro (contas a pagar): campo Data do pagamento primeiro (aceita baixa retroativa),
+  // depois a data em que virou encerrado/recebido
+  const tsPagamento = (t) => cfNum(t, CF.dataPag) || num(t.date_closed) || cfNum(t, CF.dataVenc) || num(t.due_date) || num(t.date_created);
+
+  const pais = raw.vendas.filter(t => !t.parent);
+  const filhos = raw.vendas.filter(t => t.parent);
+  const pagamentos = [];
+  const vendas = pais.map(t => {
+    const valorPai = cfNum(t, CF.valorVenda) || 0;
+    const parcelas = filhos.filter(f => f.parent === t.id);
+    const valor = valorPai > 0 ? valorPai : soma(parcelas.map(valorItem));
+    const ts = cfNum(t, CF.dataPag) || num(t.date_closed) || num(t.date_created);
+    const d = ts ? new Date(ts) : null;
+    let pago = 0;
+    if (parcelas.length) {
+      const semValor = parcelas.filter(f => !valorItem(f)).length;
+      const declarado = soma(parcelas.map(valorItem));
+      const rateio = (semValor && valorPai > valorPai - declarado) ? Math.max(0, (valorPai - declarado)) / semValor : 0;
+      for (const f of parcelas) {
+        if (!foiPago(f)) continue;
+        const v = valorItem(f) || rateio;
+        if (!v) continue;
+        pago += v;
+        const pts = tsPagamento(f), pd = pts ? new Date(pts) : null;
+        pagamentos.push({ nome: t.name + ' · ' + String(f.name).replace(/\s*[—-]\s*R\$.*$/i, ''), valor: v, ts: pts,
+          m: pd ? pd.getMonth() : null, y: pd ? pd.getFullYear() : null });
+      }
+    } else if (foiPago(t) && valor > 0) {
+      pago = valor;
+      const pts = tsPagamento(t), pd = pts ? new Date(pts) : null;
+      pagamentos.push({ nome: t.name, valor, ts: pts, m: pd ? pd.getMonth() : null, y: pd ? pd.getFullYear() : null });
+    }
+    return { nome: t.name, valor, pago, ts, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, status: normaliza(t.status && t.status.status || t.status) };
+  }).filter(v => v.valor > 0);
+
+  const respostas = raw.csat.map(t => {
+    const notas = [cfNum(t, CF.csatTraf), cfNum(t, CF.csatSM), cfNum(t, CF.csatRP), cfNum(t, CF.csatVideo)].filter(v => v != null && v > 0);
+    const per = parseMesAno(cfVal(t, CF.mesAno), t.date_created);
+    return { nome: t.name, csat: notas.length ? soma(notas) / notas.length : null, nps: cfNum(t, CF.npsGeral), m: per ? per.m : null, y: per ? per.y : null };
+  });
+
+  const ranking = raw.ranking.map(t => {
+    const per = mesDoCardRanking(t);
+    const tot = cfNum(t, CF.tarTot), atr = cfNum(t, CF.tarAtr);
+    return { nome: t.name, m: per.m, y: per.y, tot, atr: atr || 0, prod: (tot && tot > 0) ? ((tot - (atr || 0)) / tot) * 100 : null, up: cfNum(t, CF.upMes) || 0, down: cfNum(t, CF.downMes) || 0 };
+  });
+
+  const g = {}; for (const [k, id] of Object.entries(CF)) g[k] = cfNum(raw.card2026, id);
+  return { clientes, vendas, pagamentos, respostas, ranking, geral: g };
+}
+
+/* ---------------- cálculo ---------------- */
+function ativosEm(D, ts){ return D.clientes.filter(c => c.entrada && c.entrada <= ts && (!c.saida || c.saida > ts)); }
+function churnAte(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() <= m); }
+function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() === m); }
+const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
+const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
+const vendasMes = (D, m) => D.vendas.filter(v => v.y === ANO && v.m === m);
+const pagAno = (D) => (D.pagamentos || []).filter(p => p.y == null || p.y === ANO);
+const pagMes = (D, m) => (D.pagamentos || []).filter(p => p.y === ANO && p.m === m);
+
+function calcAcumulado(D){
+  const ativos = D.clientes.filter(c => ATIVOS_STATUS.includes(c.status));
+  const churn  = D.clientes.filter(c => c.status === 'churn');
+  const vendasAno = D.vendas.filter(v => v.y == null || v.y === ANO);
+  const respAno = D.respostas.filter(r => r.y == null || r.y === ANO);
+  const rankAno = D.ranking.filter(r => r.y === ANO);
+  const mrr = soma(ativos.map(c => c.vr));
+  const churnRS = soma(churn.map(c => c.vr));
+  const mrrBaseChurn = D.geral.mrrAcum || (mrr + churnRS);
+  const pgAno = pagAno(D);
+  const cross = soma(pgAno.map(p => p.valor));
+  const crossContratado = soma(vendasAno.map(v => v.valor));
+  const upClientes = soma(D.clientes.map(c => c.up));
+  const downClientes = soma(D.clientes.map(c => c.down));
+  const up   = upClientes !== 0 ? upClientes : (D.geral.somaUp != null ? D.geral.somaUp : 0);
+  const down = negDown(downClientes !== 0 ? downClientes : (D.geral.somaDown != null ? D.geral.somaDown : 0));
+  return {
+    ativos: ativos.length,
+    mrr,
+    ticket: ativos.length ? mrr / ativos.length : null,
+    nrr: D.geral.nrrAnual,
+    prod: D.geral.prodAnual != null ? D.geral.prodAnual : media(rankAno.map(r => r.prod)),
+    nps: media(respAno.map(r => r.nps)),
+    csat: media(respAno.map(r => r.csat)),
+    ltv: media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)),
+    churnRS, churnN: churn.length,
+    churnPct: mrrBaseChurn ? (churnRS / mrrBaseChurn) * 100 : null,
+    tmpChurn: media(churn.map(c => c.tmp != null ? c.tmp : (c.entrada && c.saida ? mesesEntre(c.entrada, c.saida) : null))),
+    tmpAtivos: media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))),
+    down, cross, up,
+    exp: cross + up + down,
+    nVendas: vendasAno.length,
+    crossContratado,
+    nPag: pgAno.length
+  };
+}
+
+function calcMes(D, m){
+  if (m < MES_INICIO || m > MES_ATUAL) return null;
+  const fim = fimMes(m), ini = iniMes(m);
+  const aoVivo = (m === MES_ATUAL);
+  const ativos = aoVivo ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
+  const mrr = soma(ativos.map(c => c.vr));
+  const mrrIni = soma(ativosEm(D, ini - 1).map(c => c.vr));
+  const chM = churnNoMes(D, m);
+  const churnRS = soma(chM.map(c => c.vr));
+  const rk = rankMes(D, m), rs = respMes(D, m), pg = pagMes(D, m);
+  const chAcum = churnAte(D, m);
+  const cross = soma(pg.map(p => p.valor));
+  const up = rk.length ? soma(rk.map(r => r.up)) : null;
+  const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
+  const atual = (m === MES_ATUAL);
+  return {
+    ativos: ativos.length,
+    mrr,
+    ticket: ativos.length ? mrr / ativos.length : null,
+    nrr: atual ? D.geral.nrrMensal : null,
+    prod: media(rk.map(r => r.prod)),
+    nps: media(rs.map(r => r.nps)),
+    csat: media(rs.map(r => r.csat)),
+    ltv: atual ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
+    churnRS, churnN: chM.length,
+    churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
+    tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
+    tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
+    down, cross, up,
+    exp: (cross != null && up != null && down != null) ? cross + up + down : null,
+    nVendas: null,
+    crossContratado: null,
+    nPag: pg.length
+  };
+}
+
+/* ---------------- métricas (mesmos 17 cards do ClickUp) ---------------- */
+const METRICAS = [
+  { id:'ativos',   label:'Clientes Ativos', span:'s5', get:d=>d.ativos,   fmt:fmtInt,  recon:true,  sub:d=>'carteira growth' },
+  { id:'mrr',      label:'MRR',             span:'s5', get:d=>d.mrr,      fmt:fmtBRL0, brl:true, recon:true },
+  { id:'ticket',   label:'Ticket Médio',    span:'s5', get:d=>d.ticket,   fmt:fmtBRL2, brl:true, recon:true, sub:()=>'mrr ÷ ativos' },
+  { id:'nrr',      label:'NRR',             span:'s5', get:d=>d.nrr,      fmt:fmt2,    un:'%' },
+  { id:'prod',     label:'Produtividade',   span:'',   get:d=>d.prod,     fmt:v=>v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:1}), un:'%' },
+  { id:'nps',      label:'NPS Geral',       span:'',   get:d=>d.nps,      fmt:fmt2 },
+  { id:'csat',     label:'CSAT',            span:'',   get:d=>d.csat,     fmt:fmt2 },
+  { id:'ltv',      label:'LTV',             span:'s8', get:d=>d.ltv,      fmt:fmtBRL2, brl:true, sub:()=>'média por cliente ativo' },
+  { id:'churnRS',  label:'Churn R$',        span:'',   get:d=>d.churnRS,  fmt:fmtBRL0, brl:true, inv:true },
+  { id:'churnN',   label:'Churn Nº',        span:'',   get:d=>d.churnN,   fmt:fmtInt,  inv:true },
+  { id:'churnPct', label:'Churn %',         span:'',   get:d=>d.churnPct, fmt:fmt2,    un:'%', inv:true },
+  { id:'tmpChurn', label:'TMP (churn)',     span:'',   get:d=>d.tmpChurn, fmt:fmt2,    recon:'mes', sub:()=>'meses' },
+  { id:'tmpAtivos',label:'TMP (ativos)',    span:'',   get:d=>d.tmpAtivos,fmt:fmt2,    recon:'mes', sub:()=>'meses' },
+  { id:'down',     label:'Down Sell −',     span:'',   get:d=>d.down,     fmt:fmtBRL0, brl:true },
+  { id:'cross',    label:'Cross Sell +',    span:'',   get:d=>d.cross,    fmt:fmtBRL0, brl:true, sub:d=>d.crossContratado!=null?('recebido · contratado R$ '+fmtBRL0(d.crossContratado)):(d.nPag!=null?(d.nPag+' pagamento'+(d.nPag===1?'':'s')+' no mês'):null) },
+  { id:'up',       label:'Upsell +',        span:'',   get:d=>d.up,       fmt:fmtBRL0, brl:true },
+  { id:'expansao', label:'Expansão de Receita', span:'s8', get:d=>d.exp,  fmt:fmtBRL0, brl:true,
+    sub:()=>'crossell + upsell − downsell' }
+];
+
+/* ---------------- metas ---------------- */
+const METAS = {
+  ticket:   { v: 4500, dir: '>=', label: 'meta R$ 4.500' },
+  nrr:      { v: 100,  dir: '>=', label: 'meta 100%' },
+  prod:     { v: 95,   dir: '>=', label: 'meta 95%' },
+  nps:      { v: 9,    dir: '>=', label: 'meta 9' },
+  csat:     { v: 9,    dir: '>=', label: 'meta 9' },
+  churnPct: { v: 5,    dir: '<=', label: 'meta ≤ 5%' }
+};
+function metaEstado(id, v){
+  const m = METAS[id];
+  if (!m || v == null || !isFinite(v)) return null;
+  const dentro = m.dir === '<=' ? v <= m.v : v >= m.v;
+  return dentro ? 'ok' : 'fora';
+}
+
+/* ---------------- estado + render ---------------- */
+const state = { periodo:'acc', metric:'mrr', D:null, acc:null, meses:[], bust:0 };
+
+function dadosPeriodo(){ return state.periodo === 'acc' ? state.acc : state.meses[state.periodo]; }
+function dadosAnterior(){ return (state.periodo === 'acc' || state.periodo <= MES_INICIO) ? null : state.meses[state.periodo - 1]; }
+
+function renderPeriodos(){
+  const box = $('#periodos'); box.innerHTML = '';
+  const mk = (txt, val, dis) => {
+    const b = document.createElement('button');
+    b.className = 'pill' + ((state.periodo === val) ? ' sel' : '');
+    b.textContent = txt; b.disabled = !!dis; b.setAttribute('role','tab');
+    b.onclick = () => { state.periodo = val; renderTudo(); };
+    box.appendChild(b);
+  };
+  mk('Acumulado', 'acc', false);
+  MESES.forEach((mn, i) => mk(mn, i, i < MES_INICIO || i > MES_ATUAL || !state.meses[i]));
+}
+
+function renderTitulo(){
+  if (state.periodo === 'acc') { $('#titulo').firstChild.textContent = 'Acumulado '; $('#titulo-sub').textContent = String(ANO); }
+  else {
+    const n = MESES_FULL[state.periodo];
+    $('#titulo').firstChild.textContent = n.charAt(0).toUpperCase() + n.slice(1) + ' ';
+    $('#titulo-sub').textContent = String(ANO);
+  }
+}
+
+function deltaChip(mDef, atual, ant){
+  if (state.periodo === 'acc' || ant == null || atual == null) return '';
+  const a = mDef.get(atual), b = mDef.get(ant);
+  if (a == null || b == null) return '';
+  const diff = a - b;
+  const pct = b !== 0 ? (diff / Math.abs(b)) * 100 : null;
+  if (Math.abs(diff) < 1e-9) return '<span class="delta flat">= vs ' + MESES[state.periodo - 1] + '</span>';
+  const melhor = mDef.inv ? diff < 0 : diff > 0;
+  const cls = melhor ? 'up' : 'down';
+  const sinal = diff > 0 ? '+' : '−';
+  const corpo = pct != null && isFinite(pct)
+    ? sinal + Math.abs(pct).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'
+    : sinal + fmtBRL0(Math.abs(diff));
+  return '<span class="delta ' + cls + '">' + corpo + ' vs ' + MESES[state.periodo - 1] + '</span>';
+}
+
+function renderGrid(){
+  const grid = $('#grid'); grid.innerHTML = '';
+  const d = dadosPeriodo(), ant = dadosAnterior();
+  METRICAS.forEach(mDef => {
+    const v = d ? mDef.get(d) : null;
+    const card = document.createElement('div');
+    card.className = 'card ' + (mDef.span || '') + (state.metric === mDef.id ? ' sel' : '') + (d ? '' : ' skel');
+    card.tabIndex = 0; card.dataset.m = mDef.id;
+    const showRecon = d && state.periodo !== 'acc' && state.periodo !== MES_ATUAL && (mDef.recon === true || mDef.recon === 'mes') && v != null;
+    const neg = (v != null && v < 0);
+    const estado = metaEstado(mDef.id, v);
+    const valorTxt = (v == null) ? '—'
+      : (mDef.brl ? '<span class="pref">R$</span>' + mDef.fmt(v) : mDef.fmt(v) + (mDef.un ? '<span class="un">' + mDef.un + '</span>' : ''));
+    let sub = (d && mDef.sub) ? mDef.sub(d) : null;
+    if (METAS[mDef.id]) sub = '<span class="metatag ' + (estado || '') + '">' + METAS[mDef.id].label + '</span>';
+    card.innerHTML =
+      '<div class="card-top"><span class="label">' + mDef.label + '</span>' +
+      (showRecon ? '<span class="tag">reconstruído</span>' : '') + '</div>' +
+      '<div class="valor' + (neg ? ' neg' : '') + (estado ? ' ' + estado : '') + '">' + valorTxt + '</div>' +
+      '<div class="card-foot">' + (d ? deltaChip(mDef, d, ant) : '<span class="delta flat">…</span>') +
+      '<span class="sub">' + (sub || '') + '</span></div>';
+    card.onclick = () => { state.metric = mDef.id; renderGrid(); renderChart(); abrirDetalhe(); };
+    card.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.onclick(); } };
+    grid.appendChild(card);
+  });
+}
+
+
+/* ---------------- gráfico ---------------- */
+function serieMetrica(id){
+  const mDef = METRICAS.find(x => x.id === id);
+  const pts = [];
+  for (let m = MES_INICIO; m <= MES_ATUAL; m++) {
+    const d = state.meses[m];
+    pts.push({ m, v: d ? mDef.get(d) : null });
+  }
+  return { mDef, pts };
+}
+
+function renderChart(){
+  const svg = $('#chart'); const { mDef, pts } = serieMetrica(state.metric);
+  $('#chart-metric').textContent = mDef.label;
+  const W = svg.clientWidth || 900, H = 230, padL = 14, padR = 14, padT = 18, padB = 30;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const vals = pts.map(p => p.v).filter(v => v != null);
+  svg.innerHTML = '';
+  if (!vals.length) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="rgba(238,231,223,.35)" font-family="Spline Sans Mono" font-size="12" text-anchor="middle">sem histórico para esta métrica</text>`;
+    return;
+  }
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (min === max) { min -= Math.abs(min) * 0.1 || 1; max += Math.abs(max) * 0.1 || 1; }
+  const range = max - min; min -= range * 0.12; max += range * 0.12;
+  const X = (i) => padL + (i * (W - padL - padR)) / Math.max(1, pts.length - 1);
+  const Y = (v) => padT + (H - padT - padB) * (1 - (v - min) / (max - min));
+
+  let gridLines = '';
+  for (let g = 0; g <= 3; g++) {
+    const y = padT + ((H - padT - padB) * g) / 3;
+    gridLines += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="rgba(238,231,223,.06)" stroke-width="1"/>`;
+  }
+
+  let segs = [], seg = [];
+  pts.forEach((p, i) => { if (p.v == null) { if (seg.length) segs.push(seg); seg = []; } else seg.push({ ...p, i }); });
+  if (seg.length) segs.push(seg);
+
+  let paths = '';
+  segs.forEach(s => {
+    const line = s.map((p, k) => (k ? 'L' : 'M') + X(p.i) + ' ' + Y(p.v)).join(' ');
+    if (s.length > 1) {
+      const area = line + ` L ${X(s[s.length - 1].i)} ${H - padB} L ${X(s[0].i)} ${H - padB} Z`;
+      paths += `<path d="${area}" fill="rgba(94,155,120,.12)"/>`;
+      paths += `<path d="${line}" fill="none" stroke="#5e9b78" stroke-width="2.2" stroke-linecap="round"/>`;
+    }
+  });
+
+  let dots = '', labels = '';
+  pts.forEach((p, i) => {
+    labels += `<text x="${X(i)}" y="${H - 10}" fill="rgba(238,231,223,.4)" font-family="Spline Sans Mono" font-size="10" text-anchor="middle">${MESES[p.m]}</text>`;
+    if (p.v == null) return;
+    const selMes = state.periodo === p.m;
+    dots += `<circle data-i="${i}" cx="${X(i)}" cy="${Y(p.v)}" r="${selMes ? 6 : 4.2}" fill="${selMes ? '#c89b76' : '#5e9b78'}" stroke="#0a0c0a" stroke-width="2" style="cursor:pointer"/>`;
+  });
+
+  svg.innerHTML = gridLines + paths + dots + labels;
+
+  const tip = $('#tip');
+  svg.querySelectorAll('circle').forEach(c => {
+    const i = Number(c.dataset.i), p = pts[i];
+    const mostrar = () => {
+      const txt = mDef.brl ? 'R$ ' + mDef.fmt(p.v) : mDef.fmt(p.v) + (mDef.un || '');
+      tip.innerHTML = '<b>' + MESES[p.m] + '/' + ANO + '</b> · ' + txt;
+      tip.style.left = (X(i) / W * 100) + '%';
+      tip.style.top = (Y(p.v) / H * 100) + '%';
+      tip.style.display = 'block';
+    };
+    c.addEventListener('mouseenter', mostrar);
+    c.addEventListener('mouseleave', () => tip.style.display = 'none');
+    c.addEventListener('click', () => { state.periodo = p.m; renderTudo(); });
+  });
+}
+
+/* ---------------- composição (drill-down) ---------------- */
+function detalheDados(){
+  const D = state.D; if (!D) return null;
+  const id = state.metric;
+  const mes = state.periodo === 'acc' ? null : state.periodo;
+  const fim = mes == null ? Date.now() : fimMes(mes);
+  const din  = v => v == null ? '—' : 'R$ ' + fmtBRL0(v);
+  const din2 = v => v == null ? '—' : 'R$ ' + fmtBRL2(v);
+  const dataBR = ts => ts ? new Date(ts).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit' }) : '—';
+
+  const ativos = (mes == null || mes === MES_ATUAL) ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
+  const tmpDe = c => mes == null
+    ? (c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))
+    : (c.entrada ? mesesEntre(c.entrada, fim) : null);
+
+  if (['ativos','mrr','ticket','tmpAtivos','ltv'].includes(id)) {
+    const rows = ativos.slice().sort((a,b) => b.vr - a.vr)
+      .map(c => [c.nome, din(c.vr), dataBR(c.entrada), tmpDe(c) != null ? fmt2(tmpDe(c)) : '—', c.ltv ? din2(c.ltv) : '—']);
+    const mrr = soma(ativos.map(c => c.vr));
+    return { cols:['Cliente','Valor Recorrente','Entrada','TMP (meses)','LTV'], rows,
+      resumo: ativos.length + ' clientes · MRR ' + din(mrr) + ' · ticket ' + din2(ativos.length ? mrr / ativos.length : null) };
+  }
+
+  if (['churnRS','churnN','churnPct','tmpChurn'].includes(id)) {
+    const chs = mes == null ? D.clientes.filter(c => c.status === 'churn') : churnNoMes(D, mes);
+    const rows = chs.slice().sort((a,b) => (b.saida||0) - (a.saida||0))
+      .map(c => [c.nome, din(c.vr), dataBR(c.saida), fmt2(c.tmp != null ? c.tmp : ((c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null))]);
+    const tot = soma(chs.map(c => c.vr));
+    const base = mes == null ? (D.geral.mrrAcum || null) : soma(ativosEm(D, iniMes(mes) - 1).map(c => c.vr));
+    return { cols:['Cliente','Valor Recorrente','Saída','TMP (meses)'], rows,
+      resumo: chs.length + (chs.length === 1 ? ' churn' : ' churns') + ' · ' + din(tot) +
+        (base ? ' · ' + fmt2(tot / base * 100) + '% sobre base ' + din(base) : '') };
+  }
+
+  if (id === 'cross') {
+    if (mes == null) {
+      const vs = D.vendas.filter(v => v.y == null || v.y === ANO).slice().sort((a,b) => b.valor - a.valor);
+      return { cols:['Venda','Status','Contratado','Pago'],
+        rows: vs.map(v => [v.nome, v.status || '—', din(v.valor), din(v.pago || 0)]),
+        resumo: vs.length + ' vendas · contratado ' + din(soma(vs.map(v => v.valor))) + ' · recebido ' + din(soma(vs.map(v => v.pago || 0))) };
+    }
+    const pg = pagMes(D, mes).slice().sort((a,b) => (b.ts||0) - (a.ts||0));
+    if (!pg.length) return { vazio: 'Nenhum pagamento recebido neste mês.' };
+    return { cols:['Pagamento','Data','Valor'], rows: pg.map(p => [p.nome, dataBR(p.ts), din(p.valor)]),
+      resumo: pg.length + (pg.length === 1 ? ' pagamento' : ' pagamentos') + ' · Σ ' + din(soma(pg.map(p => p.valor))) };
+  }
+
+  if (id === 'up' || id === 'down') {
+    if (mes == null) {
+      const cls = D.clientes.filter(c => c[id]).sort((a,b) => Math.abs(b[id]) - Math.abs(a[id]));
+      const tot = soma(cls.map(c => Math.abs(c[id])));
+      return { cols:['Cliente','Valor'], rows: cls.map(c => [c.nome, din(id === 'down' ? negDown(c[id]) : Math.abs(c[id]))]),
+        resumo: cls.length + (cls.length === 1 ? ' registro' : ' registros') + ' · Σ ' + din(id === 'down' ? -tot : tot) + ' · fonte: campos dos clientes (Growth)' };
+    }
+    const rk = rankMes(D, mes).filter(r => r[id]);
+    return { cols:['Colaborador','Valor'], rows: rk.map(r => [r.nome || '—', din(id === 'down' ? negDown(r[id]) : Math.abs(r[id]))]),
+      resumo: rk.length + (rk.length === 1 ? ' registro' : ' registros') + ' · fonte: cards do Ranking' };
+  }
+
+  if (id === 'prod') {
+    const rk = (mes == null ? D.ranking.filter(r => r.y === ANO) : rankMes(D, mes)).filter(r => r.prod != null);
+    const rows = rk.slice().sort((a,b) => b.prod - a.prod)
+      .map(r => [r.nome || '—', MESES[r.m], fmtInt(r.tot), fmtInt(r.atr), fmt2(r.prod) + '%']);
+    return { cols:['Colaborador','Mês','Tarefas','Atrasadas','%'], rows,
+      resumo: (mes == null && D.geral.prodAnual != null ? 'anual oficial ' + D.geral.prodAnual + '% (card 2026) · ' : '') +
+        'média da tabela ' + fmt2(media(rk.map(r => r.prod))) + '%' };
+  }
+
+  if (id === 'nps' || id === 'csat') {
+    const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : respMes(D, mes))
+      .filter(r => (id === 'csat' ? r.csat : r.nps) != null);
+    return { cols:['Envio','Mês','CSAT','NPS'],
+      rows: rs.map(r => [r.nome || 'Envio', r.m != null ? MESES[r.m] : '—', r.csat != null ? fmt2(r.csat) : '—', r.nps != null ? fmt2(r.nps) : '—']),
+      resumo: rs.length + ' respostas · CSAT médio ' + fmt2(media(rs.map(r => r.csat))) + ' · NPS médio ' + fmt2(media(rs.map(r => r.nps))) };
+  }
+
+  if (id === 'nrr') {
+    return { cols:['Métrica','Valor','Fonte'], rows: [
+      ['NRR Anual', D.geral.nrrAnual != null ? fmt2(D.geral.nrrAnual) + '%' : '—', 'card 2026'],
+      ['NRR Mensal (mês corrente)', D.geral.nrrMensal != null ? fmt2(D.geral.nrrMensal) + '%' : '—', 'card 2026']],
+      resumo: 'calculado pelos scenarios do Make e gravado no card 2026 — sem histórico retroativo' };
+  }
+
+  const d = dadosPeriodo() || {};
+  return { cols:['Componente','Valor'], rows: [
+    ['Cross Sell (recebido)', din(d.cross)], ['Upsell', din(d.up)], ['Down Sell', din(d.down)], ['Expansão de Receita', din(d.exp)]],
+    resumo: 'crossell + upsell − downsell' };
+}
+
+function abrirDetalhe(){ renderDetalhe(); $('#modal-bg').hidden = false; }
+function fecharDetalhe(){ $('#modal-bg').hidden = true; }
+
+function renderDetalhe(){
+  const box = $('#detalhe-corpo');
+  const mDef = METRICAS.find(x => x.id === state.metric);
+  $('#detalhe-titulo').innerHTML = '<em>' + mDef.label + '</em> · ' +
+    (state.periodo === 'acc' ? 'acumulado ' + ANO : MESES_FULL[state.periodo]);
+  const det = state.D ? detalheDados() : null;
+  if (!det || !det.rows.length) { box.innerHTML = '<div class="vazio">— sem registros no período</div>'; return; }
+  let html = '<div class="resumo-det">' + det.resumo + '</div><div class="tabela-wrap"><table class="tabela"><thead><tr>' +
+    det.cols.map((c,i) => '<th' + (i > 0 ? ' class="num"' : '') + '>' + c + '</th>').join('') + '</tr></thead><tbody>';
+  det.rows.forEach(r => { html += '<tr>' + r.map((c,i) => '<td' + (i > 0 ? ' class="num"' : '') + '>' + c + '</td>').join('') + '</tr>'; });
+  box.innerHTML = html + '</tbody></table></div>';
+}
+
+/* ---------------- ciclo ---------------- */
+function renderTudo(){ renderTitulo(); renderPeriodos(); renderGrid(); renderChart(); }
+
+function computa(D){
+  state.D = D;
+  state.acc = calcAcumulado(D);
+  state.meses = [];
+  for (let m = 0; m < 12; m++) state.meses[m] = calcMes(D, m);
+}
+
+async function carrega(){
+  const aviso = $('#aviso'); aviso.classList.remove('on');
+  try {
+    if (window.BIBIT_DEMO_DATA) {
+      document.body.classList.add('demo');
+      computa(window.BIBIT_DEMO_DATA);
+      $('#sync-ts').textContent = 'demo';
+      renderTudo();
+      return;
+    }
+    state.D = null; renderTudo(); // skeleton
+    const [growth, vendas, csat, ranking, card2026] = await Promise.all([
+      fetchTasks(LISTA.growth), fetchTasks(LISTA.vendas), fetchTasks(LISTA.csat), fetchTasks(LISTA.ranking), fetchJSON('task/' + CARD_2026 + '?include_subtasks=false')
+    ]);
+    computa(parseTudo({ growth, vendas, csat, ranking, card2026 }));
+    $('#sync-ts').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    renderTudo();
+  } catch (err) {
+    aviso.classList.add('on');
+    aviso.innerHTML = 'Não consegui carregar os dados do ClickUp (' + err.message +
+      '). Verifique a env <b>CLICKUP_TOKEN</b> no Vercel — diagnóstico em <span class="mono">/api/clickup?diag=1</span>.' +
+      '<button onclick="carrega()">tentar de novo</button>';
+  }
+}
+
+$('#btn-refresh').onclick = () => { state.bust = Date.now(); carrega(); };
+$('#modal-x').onclick = fecharDetalhe;
+$('#modal-bg').addEventListener('click', (e) => { if (e.target === e.currentTarget) fecharDetalhe(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharDetalhe(); });
+window.addEventListener('resize', () => { if (state.D) renderChart(); });
+carrega();
+</script>
+</body>
+</html>
