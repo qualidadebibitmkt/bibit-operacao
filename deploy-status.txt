@@ -1,45 +1,19 @@
-diag: {"CLICKUP_TOKEN":"OK"}
-raiz: 200
-vercel_auth: 200
-data: 2026-08-25T21:40:07Z
---- quem ---
-conta: qualidade-1171  |  email: qualidade@bibitmkt.com.br  |  nome: Bibit Marketing
---- resolucao ---
-times: bibit-marketing
-resolvido: org=team_SSWS3HUzlxGBMf5fJZNet6Z7 projeto=prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v
---- log do deploy (fim) ---
-he CLI.
-> This information is used to shape the CLI roadmap and prioritize features.
-> You can learn more, including how to opt-out if you'd not like to participate in this program, by visiting the following URL:
-> https://vercel.com/docs/cli/about-telemetry
-Retrieving project…
-> Downloading `production` environment variables for bibit-marketing/bibit-operacao
-Downloading
-
-✓ Created         .vercel/.env.production.local file
-
-> Downloading project settings
-Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/project.json [0ms]
-Vercel CLI 59.5.0 (Node.js 22.23.2)
-Retrieving project…
-Deploying bibit-marketing/bibit-operacao
-Uploading [--------------------] (0.0B/8.2KB)
-Uploading [====================] (8.2KB/8.2KB)
-  Inspect         https://vercel.com/bibit-marketing/bibit-operacao/FvPFsu2KcdAGAXQLgAioC1wM8Y8T
-  Production      https://bibit-operacao-p82734vag-bibit-marketing.vercel.app
-https://bibit-operacao-p82734vag-bibit-marketing.vercel.appBuilding…
-Building…
-Running build in Washington, D.C., USA (East) – iad1
-Build machine configuration: 2 cores, 8 GB
-Retrieving list of deployment files...
-Previous build caches not available.
-Downloading 10 deployment files...
-Running "vercel build"
-Vercel CLI 59.5.0
-Build Completed in /vercel/output [90ms]
-Deploying outputs...
-[2K[1A[2K[G  Production      https://bibit-operacao-p82734vag-bibit-marketing.vercel.app
-Completing…
-▲ Aliased         https://bibit-operacao.vercel.app
-
-✓ Ready in 7s
+proxy qualidadebibitmkt-bibit-operacao: 200
+proxy bibit-operacao: 500
+data: 2026-08-25T21:46:34Z
+--- token ---
+org: team_SSWS3HUzlxGBMf5fJZNet6Z7
+qualidadebibitmkt-bibit-operacao: 0 chars | ClickUp: 400
+bibit-ranking: 0 chars | ClickUp: 400
+individual-gabriela: 0 chars | ClickUp: 400
+individual-daniel: 0 chars | ClickUp: 400
+ranking-will: 0 chars | ClickUp: 400
+individual-michelle: 0 chars | ClickUp: 400
+bibit-comissoes: 0 chars | ClickUp: 400
+individual-beltrao: 0 chars | ClickUp: 400
+SEM token valido em projeto nenhum — pedir token do ClickUp ao Bruno
+env corrigida em prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ
+env corrigida em prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v
+--- junho ---
+auditoria nao rodou
+--- deploys ---
