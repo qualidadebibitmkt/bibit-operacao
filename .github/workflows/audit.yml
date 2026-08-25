@@ -1,0 +1,25 @@
+name: Auditoria Cross
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Puxar Cross-Sell e auditar
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e
+          AUTH="Authorization: Bearer $VERCEL_TOKEN"
+          ORG=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "$AUTH" | jq -r '.teams[]|select(.slug=="bibit-marketing")|.id')
+          PID=$(curl -s "https://api.vercel.com/v9/projects?teamId=$ORG&search=bibit-operacao" -H "$AUTH" | jq -r '.projects[0].id')
+          EID=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$ORG" -H "$AUTH" | jq -r '.envs[]|select(.key=="CLICKUP_TOKEN")|.id'|head -1)
+          CU=$(curl -s "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$ORG&decrypt=true" -H "$AUTH" | jq -r '.value')
+          echo "::add-mask::$CU"
+          curl -s "https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true&page=0" -H "Authorization: $CU" > /tmp/cs.json
+          jq -r '.tasks[] | [.id, (.parent//"-"), .status.status, (.date_closed//"-"), ((.custom_fields[]?|select(.id=="01454349-1cb6-4e8a-a665-7d7e74420d64")|.value)//"-"), ((.custom_fields[]?|select(.id=="435d3c37-e413-4362-9c21-bdba5b6473d0")|.value)//"-"), .name] | @tsv' /tmp/cs.json > auditoria-cross.tsv
+          wc -l auditoria-cross.tsv
+          git config user.name "audit-bot"; git config user.email "bot@bibit"
+          git add auditoria-cross.tsv; git commit -m "auditoria cross [skip ci]" || true; git push || true
