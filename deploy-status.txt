@@ -1,19 +1,26 @@
-proxy qualidadebibitmkt-bibit-operacao: 200
-proxy bibit-operacao: 500
-data: 2026-08-25T21:46:34Z
+proxy principal: 200
+proxy duplicado: 200
+data: 2026-08-25T21:52:33Z
 --- token ---
 org: team_SSWS3HUzlxGBMf5fJZNet6Z7
-qualidadebibitmkt-bibit-operacao: 0 chars | ClickUp: 400
-bibit-ranking: 0 chars | ClickUp: 400
-individual-gabriela: 0 chars | ClickUp: 400
-individual-daniel: 0 chars | ClickUp: 400
-ranking-will: 0 chars | ClickUp: 400
-individual-michelle: 0 chars | ClickUp: 400
-bibit-comissoes: 0 chars | ClickUp: 400
-individual-beltrao: 0 chars | ClickUp: 400
-SEM token valido em projeto nenhum — pedir token do ClickUp ao Bruno
-env corrigida em prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ
-env corrigida em prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v
---- junho ---
-auditoria nao rodou
+teste do token recebido no ClickUp: 200
+prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ: env gravada
+prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v: env gravada
+--- meses ---
+05/2026: 1 pagamentos = R$ 1,500.00
+06/2026: 2 pagamentos = R$ 4,350.00
+   Parcela 1 | R$ 3,750.00 | 03/06/26
+   Folders - Venga Vino | R$ 600.00 | 01/06/26
+07/2026: 14 pagamentos = R$ 41,540.00
+08/2026: 4 pagamentos = R$ 68,400.00
 --- deploys ---
+== prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ ==
+Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/project.json [1ms]
+  Production      https://qualidadebibitmkt-bibit-operacao-1pg587k4x-bibit-marketing.vercel.app
+[2K[1A[2K[G  Production      https://qualidadebibitmkt-bibit-operacao-1pg587k4x-bibit-marketing.vercel.app
+▲ Aliased         https://qualidadebibitmkt-bibit-operacao.vercel.app
+== prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v ==
+Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/project.json [0ms]
+  Production      https://bibit-operacao-qjwwztimw-bibit-marketing.vercel.app
+[2K[1A[2K[G  Production      https://bibit-operacao-qjwwztimw-bibit-marketing.vercel.app
+▲ Aliased         https://bibit-operacao.vercel.app

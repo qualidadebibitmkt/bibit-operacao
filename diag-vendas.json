@@ -1,1 +1,131 @@
-{"diag": {"token_chars": 11, "erro": "HTTP Error 401: Unauthorized", "n": 0}, "linhas": []}
+{
+ "geradoEm": "2026-08-25T21:52:21.573764",
+ "linhas": [
+  {
+   "nome": "Mare Nostrum — Parcela 2/2 — R$ 5.500 (ago/26)",
+   "valor": 5500.0,
+   "mes": "08/2026",
+   "data": "15/08/26"
+  },
+  {
+   "nome": "Mare Nostrum — Parcela 1/2 — R$ 5.500 (jul/26)",
+   "valor": 5500.0,
+   "mes": "07/2026",
+   "data": "15/07/26"
+  },
+  {
+   "nome": "Parcela 1 — R$ 5900",
+   "valor": 5900.0,
+   "mes": "08/2026",
+   "data": "06/08/26"
+  },
+  {
+   "nome": "Parcela 10/08 — R$ 28500",
+   "valor": 28500.0,
+   "mes": "08/2026",
+   "data": "10/08/26"
+  },
+  {
+   "nome": "Parcela 07/08 — R$ 28500",
+   "valor": 28500.0,
+   "mes": "08/2026",
+   "data": "04/08/26"
+  },
+  {
+   "nome": "Parcela 3 — R$ 5.500",
+   "valor": 5500.0,
+   "mes": "07/2026",
+   "data": "15/07/26"
+  },
+  {
+   "nome": "Parcela 2 — R$ 3.300",
+   "valor": 3300.0,
+   "mes": "07/2026",
+   "data": "15/07/26"
+  },
+  {
+   "nome": "Parcela 1 — R$ 5.940",
+   "valor": 5940.0,
+   "mes": "07/2026",
+   "data": "15/07/26"
+  },
+  {
+   "nome": "PRESSKIT ROCK BREWING",
+   "valor": 3500.0,
+   "mes": "07/2026",
+   "data": "15/07/26"
+  },
+  {
+   "nome": "PRESSKIT VERANO",
+   "valor": 3500.0,
+   "mes": "07/2026",
+   "data": "15/07/26"
+  },
+  {
+   "nome": "Parcela  — R$ 350",
+   "valor": 350.0,
+   "mes": "07/2026",
+   "data": "14/07/26"
+  },
+  {
+   "nome": "Parcela  — R$ 350",
+   "valor": 350.0,
+   "mes": "07/2026",
+   "data": "14/07/26"
+  },
+  {
+   "nome": "Parcela  — R$ 350",
+   "valor": 350.0,
+   "mes": "07/2026",
+   "data": "10/07/26"
+  },
+  {
+   "nome": "VIDEOS l BEIJO DA ONÇA",
+   "valor": 6000.0,
+   "mes": "07/2026",
+   "data": "01/07/26"
+  },
+  {
+   "nome": "Parcela 2",
+   "valor": 1500.0,
+   "mes": "07/2026",
+   "data": "13/07/26"
+  },
+  {
+   "nome": "Parcela 1",
+   "valor": 1500.0,
+   "mes": "07/2026",
+   "data": "13/07/26"
+  },
+  {
+   "nome": "Parcela 2",
+   "valor": 3750.0,
+   "mes": "07/2026",
+   "data": "03/07/26"
+  },
+  {
+   "nome": "Parcela 1",
+   "valor": 3750.0,
+   "mes": "06/2026",
+   "data": "03/06/26"
+  },
+  {
+   "nome": "CASA DA ROÇA (PLANO FOTOS BASIC)",
+   "valor": 500.0,
+   "mes": "07/2026",
+   "data": "09/07/26"
+  },
+  {
+   "nome": "Pacote de Vídeo - Redes Sociais - Standart - MyFruit",
+   "valor": 1500.0,
+   "mes": "05/2026",
+   "data": "05/05/26"
+  },
+  {
+   "nome": "Folders - Venga Vino",
+   "valor": 600.0,
+   "mes": "06/2026",
+   "data": "01/06/26"
+  }
+ ]
+}
