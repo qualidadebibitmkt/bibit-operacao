@@ -98,10 +98,12 @@ jobs:
       - name: Sonda do site vivo
         run: |
           B=$(date +%s)
-          curl -s "https://qualidadebibitmkt-bibit-operacao.vercel.app/?b=$B" -o live-index.html
-          curl -s "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?path=list%2F901713519081%2Ftask%3Finclude_closed%3Dtrue%26subtasks%3Dtrue%26page%3D0&b=$B" -o proxy-vendas.json
-          echo "html: $(wc -c < live-index.html) bytes | marcador financeiro: $(grep -c 'regra do financeiro' live-index.html || true)" | tee /tmp/sonda.txt
-          python3 -c "import json;d=json.load(open('proxy-vendas.json'));t=d.get('tasks',[]);print('proxy tasks:',len(t),'| com parent:',sum(1 for x in t if x.get('parent')),'| com custom_fields:',sum(1 for x in t if x.get('custom_fields')))" | tee -a /tmp/sonda.txt
+          for DOM in qualidadebibitmkt-bibit-operacao bibit-operacao; do
+            curl -s "https://$DOM.vercel.app/?b=$B" -o sonda-$DOM.html
+            curl -s "https://$DOM.vercel.app/api/clickup?path=list%2F901713519081%2Ftask%3Finclude_closed%3Dtrue%26subtasks%3Dtrue%26page%3D0&b=$B" -o sonda-$DOM-vendas.json
+            curl -s "https://$DOM.vercel.app/api/clickup?path=list%2F901712531318%2Ftask%3Finclude_closed%3Dtrue%26subtasks%3Dfalse%26page%3D0&b=$B" -o sonda-$DOM-growth.json
+            echo "$DOM html: $(wc -c < sonda-$DOM.html) bytes sha:$(sha256sum sonda-$DOM.html | cut -c1-12)" | tee -a /tmp/sonda.txt
+          done
 
       - name: Registrar resultado
         if: always()
@@ -116,7 +118,7 @@ jobs:
             echo '--- deploys ---'; cat /tmp/deploy.log 2>/dev/null; } > deploy-status.txt
           git config user.name "deploy-bot"; git config user.email "bot@bibit"
           echo '--- sonda ---' >> deploy-status.txt; cat /tmp/sonda.txt >> deploy-status.txt 2>/dev/null
-          git add deploy-status.txt diag-vendas.json live-index.html proxy-vendas.json 2>/dev/null || git add deploy-status.txt
+          git add deploy-status.txt diag-vendas.json sonda-*.html sonda-*.json 2>/dev/null || git add deploy-status.txt
           git commit -m "status do deploy [skip ci]" || true
           git push || true
           true
