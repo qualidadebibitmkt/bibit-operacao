@@ -1,0 +1,37 @@
+name: Diag vendas
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  extrair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolver projeto e baixar envs
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          AUTH="Authorization: Bearer $VERCEL_TOKEN"
+          ORG_ID=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "$AUTH" | jq -r '.teams[]? | select(.slug=="bibit-marketing") | .id')
+          export VERCEL_ORG_ID=$ORG_ID
+          export VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ
+          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN
+          grep -o 'CLICKUP_TOKEN="[^"]*"' .vercel/.env.production.local | cut -d'"' -f2 > /tmp/ct.txt
+          echo "token clickup extraido: $(wc -c < /tmp/ct.txt) bytes"
+      - name: Baixar lista de vendas completa
+        run: |
+          CT=$(cat /tmp/ct.txt)
+          : > /tmp/all.json
+          for P in 0 1 2; do
+            curl -s "https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true&page=$P" \
+              -H "Authorization: $CT" > /tmp/p$P.json
+            N=$(jq '.tasks | length' /tmp/p$P.json)
+            echo "pagina $P: $N tasks"
+            [ "$N" = "0" ] && break
+          done
+          jq -s '{tasks: (map(.tasks) | add)}' /tmp/p*.json > diag-vendas.json
+          jq '.tasks | length' diag-vendas.json
+          git config user.name diag-bot; git config user.email bot@bibit
+          git add diag-vendas.json
+          git commit -m "diag: dataset de vendas [skip ci]"
+          git push
