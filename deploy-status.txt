@@ -1,15 +1,14 @@
 diag: {"CLICKUP_TOKEN":"OK"}
 raiz: 200
 vercel_auth: 200
-data: 2026-08-25T21:26:51Z
+data: 2026-08-25T21:33:44Z
 --- quem ---
 conta: qualidade-1171  |  email: qualidade@bibitmkt.com.br  |  nome: Bibit Marketing
 --- resolucao ---
 times: bibit-marketing
 resolvido: org=team_SSWS3HUzlxGBMf5fJZNet6Z7 projeto=prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v
 --- log do deploy (fim) ---
-CLI roadmap and prioritize features.
-> You can learn more, including how to opt-out if you'd not like to participate in this program, by visiting the following URL:
+cipate in this program, by visiting the following URL:
 > https://vercel.com/docs/cli/about-telemetry
 Retrieving project…
 > Downloading `production` environment variables for bibit-marketing/bibit-operacao
@@ -22,12 +21,14 @@ Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/proj
 Vercel CLI 59.5.0 (Node.js 22.23.2)
 Retrieving project…
 Deploying bibit-marketing/bibit-operacao
-Uploading [--------------------] (0.0B/3.4KB)
-Uploading [=========-----------] (1.6KB/3.4KB)
-Uploading [====================] (3.4KB/3.4KB)
-  Inspect         https://vercel.com/bibit-marketing/bibit-operacao/ADasAFX5C2FcLg4JR1YaS1YhFCDe
-  Production      https://bibit-operacao-czarxuxlg-bibit-marketing.vercel.app
-https://bibit-operacao-czarxuxlg-bibit-marketing.vercel.appBuilding…
+Uploading [--------------------] (0.0B/140.5KB)
+Uploading [======--------------] (48.0KB/140.5KB)
+Uploading [===========---------] (81.8KB/140.5KB)
+Uploading [================----] (113.8KB/140.5KB)
+Uploading [====================] (140.5KB/140.5KB)
+  Inspect         https://vercel.com/bibit-marketing/bibit-operacao/2L4PYkMB4P4BucyGyxpQY6zftxuB
+  Production      https://bibit-operacao-hvpio2kd2-bibit-marketing.vercel.app
+https://bibit-operacao-hvpio2kd2-bibit-marketing.vercel.appBuilding…
 Building…
 Running build in Washington, D.C., USA (East) – iad1
 Build machine configuration: 2 cores, 8 GB
@@ -38,8 +39,8 @@ Running "vercel build"
 Vercel CLI 59.5.0
 Build Completed in /vercel/output [101ms]
 Deploying outputs...
-[2K[1A[2K[G  Production      https://bibit-operacao-czarxuxlg-bibit-marketing.vercel.app
+[2K[1A[2K[G  Production      https://bibit-operacao-hvpio2kd2-bibit-marketing.vercel.app
 Completing…
 ▲ Aliased         https://bibit-operacao.vercel.app
 
-✓ Ready in 7s
+✓ Ready in 8s
