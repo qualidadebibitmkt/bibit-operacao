@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>25/08 22:18</b></div>
   </div>
 </aside>
 
@@ -809,6 +809,7 @@ function computa(D){
 }
 
 async function carrega(){
+  state.bust = Date.now();
   const aviso = $('#aviso'); aviso.classList.remove('on');
   try {
     if (window.BIBIT_DEMO_DATA) {
