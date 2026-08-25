@@ -17,18 +17,44 @@ jobs:
           set -e
           AUTH="Authorization: Bearer $VERCEL_TOKEN"
           ORG_ID=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "$AUTH" | jq -r '.teams[] | select(.slug=="bibit-marketing") | .id')
-          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN --scope=$ORG_ID > /dev/null 2>&1 || npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN > /dev/null 2>&1
-          CT=$(grep -oP 'CLICKUP_TOKEN="?\K[^"\n]+' .vercel/.env.production.local | head -n1)
-          [ -z "$CT" ] && { echo "sem CLICKUP_TOKEN"; exit 1; }
-          curl -s "https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true&page=0" \
-            -H "Authorization: $CT" -o /tmp/vendas.json
-          jq '[.tasks[] | {id, parent, name, status: .status.status,
-                criada: .date_created, fechada: .date_closed, concluida: .date_done, venc: .due_date,
-                valor: ([.custom_fields[]? | select(.id=="01454349-1cb6-4e8a-a665-7d7e74420d64") | .value][0]),
-                dataPag: ([.custom_fields[]? | select(.id=="435d3c37-e413-4362-9c21-bdba5b6473d0") | .value][0])}]' \
-            /tmp/vendas.json > diag-vendas.json
-          echo "linhas: $(jq length diag-vendas.json)"
+          VERCEL_ORG_ID=$ORG_ID VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN
+          python3 - << 'PY'
+          import json, os, re, urllib.request
+          diag = {}
+          env = open('.vercel/.env.production.local', encoding='utf-8', errors='replace').read()
+          m = re.search(r'CLICKUP_TOKEN="?([^"\n]+)"?', env)
+          tok = m.group(1).strip() if m else ''
+          diag['token_chars'] = len(tok)
+          req = urllib.request.Request(
+              'https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true&page=0',
+              headers={'Authorization': tok})
+          try:
+              with urllib.request.urlopen(req) as r:
+                  diag['http'] = r.status
+                  data = json.loads(r.read())
+          except Exception as e:
+              diag['erro'] = str(e)[:300]
+              data = {}
+          VV = '01454349-1cb6-4e8a-a665-7d7e74420d64'
+          DP = '435d3c37-e413-4362-9c21-bdba5b6473d0'
+          def cf(t, cid):
+              for c in (t.get('custom_fields') or []):
+                  if c.get('id') == cid:
+                      return c.get('value')
+              return None
+          linhas = []
+          for t in (data.get('tasks') or []):
+              linhas.append({
+                  'id': t.get('id'), 'parent': t.get('parent'), 'name': t.get('name'),
+                  'status': (t.get('status') or {}).get('status'),
+                  'criada': t.get('date_created'), 'fechada': t.get('date_closed'),
+                  'concluida': t.get('date_done'), 'venc': t.get('due_date'),
+                  'valor': cf(t, VV), 'dataPag': cf(t, DP)})
+          diag['n'] = len(linhas)
+          json.dump({'diag': diag, 'linhas': linhas}, open('diag-vendas.json', 'w'), ensure_ascii=False)
+          print('diag:', diag)
+          PY
           git config user.name diag-bot; git config user.email bot@bibit
           git add diag-vendas.json
-          git commit -m "diag: dump da lista de vendas [skip ci]" || true
+          git commit -m "diag: dump vendas v2 [skip ci]" || true
           git push
