@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Resolver projeto e baixar env
+      - name: Resolver projeto
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
@@ -19,23 +19,29 @@ jobs:
           ORG_ID=$(echo "$TEAMS" | jq -r '.teams[]? | select(.slug=="bibit-marketing") | .id')
           echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
           echo "VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ" >> $GITHUB_ENV
-      - name: Puxar vendas do ClickUp e gravar relatório
+      - name: Puxar vendas e gravar relatório com log
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN
-          export $(grep CLICKUP_TOKEN .vercel/.env.production.local | tr -d '"')
-          curl -s "https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true" \
-            -H "Authorization: $CLICKUP_TOKEN" | jq '[.tasks[] | {
+          LOG=diag-log.txt
+          : > $LOG
+          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN >> $LOG 2>&1 || echo "pull falhou" >> $LOG
+          CLICKUP_TOKEN=$(sed -n 's/^CLICKUP_TOKEN=\"\{0,1\}\([^\"]*\)\"\{0,1\}$/\1/p' .vercel/.env.production.local | head -n1)
+          echo "token len: ${#CLICKUP_TOKEN}" >> $LOG
+          CODE=$(curl -s -o /tmp/vendas.json -w "%{http_code}" "https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true" -H "Authorization: $CLICKUP_TOKEN")
+          echo "clickup http: $CODE" >> $LOG
+          echo "bytes resposta: $(wc -c < /tmp/vendas.json)" >> $LOG
+          head -c 300 /tmp/vendas.json >> $LOG; echo >> $LOG
+          jq '[.tasks[] | {
               id, name, parent,
               status: .status.status,
               created: .date_created, closed: .date_closed, due: .due_date,
-              vv:  (first(.custom_fields[]? | select(.id=="01454349-1cb6-4e8a-a665-7d7e74420d64") | .value) // null),
-              dp:  (first(.custom_fields[]? | select(.id=="435d3c37-e413-4362-9c21-bdba5b6473d0") | .value) // null),
-              vpa: (first(.custom_fields[]? | select(.id=="3482e7a2-3a3c-4214-a8bc-bae71a56eab3") | .value) // null)
-            }]' > diag-vendas.json
-          wc -c diag-vendas.json
+              vv:  ((.custom_fields // []) | map(select(.id=="01454349-1cb6-4e8a-a665-7d7e74420d64")) | (.[0].value // null)),
+              dp:  ((.custom_fields // []) | map(select(.id=="435d3c37-e413-4362-9c21-bdba5b6473d0")) | (.[0].value // null)),
+              vpa: ((.custom_fields // []) | map(select(.id=="3482e7a2-3a3c-4214-a8bc-bae71a56eab3")) | (.[0].value // null))
+            }]' /tmp/vendas.json > diag-vendas.json 2>> $LOG || echo "jq falhou" >> $LOG
+          echo "bytes diag: $(wc -c < diag-vendas.json)" >> $LOG
           git config user.name "diag-bot"; git config user.email "bot@bibit"
-          git add diag-vendas.json
-          git commit -m "diag: snapshot vendas [skip ci]" || true
+          git add diag-vendas.json $LOG
+          git commit -m "diag: snapshot vendas v2 [skip ci]" || true
           git push || true
