@@ -50,34 +50,37 @@ jobs:
           echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
           echo "VERCEL_PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
 
-      - name: Garantir CLICKUP_TOKEN no projeto
-        continue-on-error: true   # guarda de env não pode derrubar o deploy
+      - name: Garantir CLICKUP_TOKEN valido
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          set -e
           AUTH="Authorization: Bearer $VERCEL_TOKEN"
-          HAS=$(curl -s "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '[.envs[]? | select(.key=="CLICKUP_TOKEN")] | length')
-          echo "CLICKUP_TOKEN ja existe? $HAS"
-          if [ "$HAS" -ge 1 ]; then exit 0; fi
+          LOG=/tmp/token.log
+          testa() { curl -s -o /dev/null -w "%{http_code}" "https://api.clickup.com/api/v2/list/901712531318/task?page=0" -H "Authorization: $1"; }
+          # 1) situacao atual da env deste projeto
+          ENVS=$(curl -s "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH")
+          EID=$(echo "$ENVS" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
+          ATUAL=""
+          [ -n "$EID" ] && ATUAL=$(curl -s "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$EID?teamId=$VERCEL_ORG_ID&decrypt=true" -H "$AUTH" | jq -r '.value // empty')
+          echo "env atual: ${#ATUAL} chars | teste ClickUp: $(testa "$ATUAL")" | tee -a $LOG
+          if [ "$(testa "$ATUAL")" = "200" ]; then echo "token atual OK" | tee -a $LOG; exit 0; fi
+          # 2) varrer projetos irmaos por um token que PASSE no teste
+          BOM=""
           PROJS=$(curl -s "https://api.vercel.com/v9/projects?teamId=$VERCEL_ORG_ID&limit=100" -H "$AUTH" | jq -r '.projects[] | "\(.id) \(.name)"')
-          echo "projetos no time:"; echo "$PROJS"
           while read -r PID PNAME; do
             [ "$PID" = "$VERCEL_PROJECT_ID" ] && continue
-            EID=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
-            if [ -n "$EID" ] && [ "$EID" != "null" ]; then
-              VAL=$(curl -s "https://api.vercel.com/v9/projects/$PID/env/$EID?teamId=$VERCEL_ORG_ID&decrypt=true" -H "$AUTH" | jq -r '.value // empty')
-              if [ -n "$VAL" ]; then
-                echo "::add-mask::$VAL"
-                echo "copiando CLICKUP_TOKEN do projeto: $PNAME"
-                curl -s -X POST "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" -H "Content-Type: application/json" \
-                  -d "{\"key\":\"CLICKUP_TOKEN\",\"value\":\"$VAL\",\"type\":\"encrypted\",\"target\":[\"production\",\"preview\",\"development\"]}" \
-                  | jq -r 'if .created then "env criada com sucesso" else (.error.message // "resposta inesperada") end'
-                exit 0
-              fi
-            fi
+            E2=$(curl -s "https://api.vercel.com/v9/projects/$PID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" | jq -r '.envs[]? | select(.key=="CLICKUP_TOKEN") | .id' | head -n1)
+            [ -z "$E2" ] || [ "$E2" = "null" ] && continue
+            V2=$(curl -s "https://api.vercel.com/v9/projects/$PID/env/$E2?teamId=$VERCEL_ORG_ID&decrypt=true" -H "$AUTH" | jq -r '.value // empty')
+            C2=$(testa "$V2")
+            echo "irmao $PNAME: ${#V2} chars | teste: $C2" | tee -a $LOG
+            if [ "$C2" = "200" ]; then BOM="$V2"; echo "::add-mask::$BOM"; echo "token valido achado em: $PNAME" | tee -a $LOG; break; fi
           done <<< "$PROJS"
-          echo "AVISO: nao achei CLICKUP_TOKEN em nenhum projeto irmao — diag vai responder VAZIO"
+          if [ -z "$BOM" ]; then echo "NENHUM irmao tem token valido — pedir ao Bruno o token do ClickUp" | tee -a $LOG; exit 0; fi
+          # 3) regravar a env deste projeto com o token valido
+          [ -n "$EID" ] && curl -s -X DELETE "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$EID?teamId=$VERCEL_ORG_ID" -H "$AUTH" > /dev/null
+          curl -s -X POST "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env?teamId=$VERCEL_ORG_ID" -H "$AUTH" -H "Content-Type: application/json" \
+            -d "{\"key\":\"CLICKUP_TOKEN\",\"value\":\"$BOM\",\"type\":\"encrypted\",\"target\":[\"production\",\"preview\",\"development\"]}" | jq -r 'if .created then "env regravada com token valido" else (.error.message // "erro ao gravar") end' | tee -a $LOG
 
       - name: Deploy producao
         env:
@@ -93,7 +96,7 @@ jobs:
         run: |
           sleep 10
           DIAG=$(curl -s --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?diag=1" || echo "sem resposta")
-          RAIZ=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/" || echo "000")
+          PROXY=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/api/clickup?path=list%2F901712531318%2Ftask%3Fpage%3D0" || echo 000); echo "proxy real: $PROXY" >> /tmp/token.log; RAIZ=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "https://qualidadebibitmkt-bibit-operacao.vercel.app/" || echo "000")
           printf 'diag: %s\nraiz: %s\nvercel_auth: %s\ndata: %s\n' "$DIAG" "$RAIZ" "${vercel_auth_http:-?}" "$(date -u +%FT%TZ)" | tee deploy-status.txt; { echo '--- quem ---'; cat /tmp/quem.txt 2>/dev/null; echo '--- resolucao ---'; cat /tmp/resolve.log 2>/dev/null || echo 'sem resolucao'; echo '--- log do deploy (fim) ---'; tail -c 1500 /tmp/deploy.log 2>/dev/null || echo 'sem log'; } >> deploy-status.txt
           git config user.name "deploy-bot"; git config user.email "bot@bibit"
           git add deploy-status.txt
