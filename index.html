@@ -362,18 +362,45 @@ function parseTudo(raw){
     };
   });
 
-  // Vendas por família: o card-pai carrega o total contratado; se o pai não tem valor,
-  // a venda é a soma das parcelas (subtarefas). Nunca conta pai + parcela em dobro.
+  // Vendas por família: o card-pai carrega o total CONTRATADO; se o pai não tem valor,
+  // a venda é a soma das parcelas. Nunca conta pai + parcela em dobro.
+  // Pagamentos (regime de caixa): parcela com status "recebido" entra no mês em que foi paga
+  // (Data do pagamento → data de fechamento). Venda sem parcelas e recebida = pago integral.
+  const valorDoNome = (nome) => {
+    const mm = String(nome || '').match(/R\$\s*([\d\.]+(?:,\d{1,2})?)/i);
+    if (!mm) return null;
+    return num(mm[1].replace(/\./g, '').replace(',', '.'));
+  };
+  const foiPago = (t) => normaliza(t.status && t.status.status || t.status).includes('recebido');
+  const valorItem = (t) => { const v = cfNum(t, CF.valorVenda); return (v != null && v > 0) ? v : (valorDoNome(t.name) || 0); };
+  const tsPagamento = (t) => cfNum(t, CF.dataPag) || num(t.date_closed) || num(t.due_date) || num(t.date_created);
+
   const pais = raw.vendas.filter(t => !t.parent);
   const filhos = raw.vendas.filter(t => t.parent);
+  const pagamentos = [];
   const vendas = pais.map(t => {
     const valorPai = cfNum(t, CF.valorVenda) || 0;
     const parcelas = filhos.filter(f => f.parent === t.id);
-    const valorParcelas = soma(parcelas.map(f => cfNum(f, CF.valorVenda)));
-    const valor = valorPai > 0 ? valorPai : valorParcelas;
+    const valor = valorPai > 0 ? valorPai : soma(parcelas.map(valorItem));
     const ts = cfNum(t, CF.dataPag) || num(t.date_closed) || num(t.date_created);
     const d = ts ? new Date(ts) : null;
-    return { nome: t.name, valor, ts, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, status: normaliza(t.status && t.status.status || t.status) };
+    let pago = 0;
+    if (parcelas.length) {
+      for (const f of parcelas) {
+        if (!foiPago(f)) continue;
+        const v = valorItem(f);
+        if (!v) continue;
+        pago += v;
+        const pts = tsPagamento(f), pd = pts ? new Date(pts) : null;
+        pagamentos.push({ nome: t.name + ' · ' + String(f.name).replace(/\s*[—-]\s*R\$.*$/i, ''), valor: v, ts: pts,
+          m: pd ? pd.getMonth() : null, y: pd ? pd.getFullYear() : null });
+      }
+    } else if (foiPago(t) && valor > 0) {
+      pago = valor;
+      const pts = tsPagamento(t), pd = pts ? new Date(pts) : null;
+      pagamentos.push({ nome: t.name, valor, ts: pts, m: pd ? pd.getMonth() : null, y: pd ? pd.getFullYear() : null });
+    }
+    return { nome: t.name, valor, pago, ts, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, status: normaliza(t.status && t.status.status || t.status) };
   }).filter(v => v.valor > 0);
 
   const respostas = raw.csat.map(t => {
@@ -389,7 +416,7 @@ function parseTudo(raw){
   });
 
   const g = {}; for (const [k, id] of Object.entries(CF)) g[k] = cfNum(raw.card2026, id);
-  return { clientes, vendas, respostas, ranking, geral: g };
+  return { clientes, vendas, pagamentos, respostas, ranking, geral: g };
 }
 
 /* ---------------- cálculo ---------------- */
@@ -399,6 +426,8 @@ function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' &&
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
 const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
 const vendasMes = (D, m) => D.vendas.filter(v => v.y === ANO && v.m === m);
+const pagAno = (D) => (D.pagamentos || []).filter(p => p.y == null || p.y === ANO);
+const pagMes = (D, m) => (D.pagamentos || []).filter(p => p.y === ANO && p.m === m);
 
 function calcAcumulado(D){
   const ativos = D.clientes.filter(c => ATIVOS_STATUS.includes(c.status));
@@ -409,7 +438,9 @@ function calcAcumulado(D){
   const mrr = soma(ativos.map(c => c.vr));
   const churnRS = soma(churn.map(c => c.vr));
   const mrrBaseChurn = D.geral.mrrAcum || (mrr + churnRS);
-  const cross = soma(vendasAno.map(v => v.valor));
+  const pgAno = pagAno(D);
+  const cross = soma(pgAno.map(p => p.valor));
+  const crossContratado = soma(vendasAno.map(v => v.valor));
   const upClientes = soma(D.clientes.map(c => c.up));
   const downClientes = soma(D.clientes.map(c => c.down));
   const up   = upClientes !== 0 ? upClientes : (D.geral.somaUp != null ? D.geral.somaUp : 0);
@@ -429,7 +460,9 @@ function calcAcumulado(D){
     tmpAtivos: media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))),
     down, cross, up,
     exp: cross + up + down,
-    nVendas: vendasAno.length
+    nVendas: vendasAno.length,
+    crossContratado,
+    nPag: pgAno.length
   };
 }
 
@@ -442,9 +475,9 @@ function calcMes(D, m){
   const mrrIni = soma(ativosEm(D, ini - 1).map(c => c.vr));
   const chM = churnNoMes(D, m);
   const churnRS = soma(chM.map(c => c.vr));
-  const rk = rankMes(D, m), rs = respMes(D, m), vd = vendasMes(D, m);
+  const rk = rankMes(D, m), rs = respMes(D, m), pg = pagMes(D, m);
   const chAcum = churnAte(D, m);
-  const cross = soma(vd.map(v => v.valor));
+  const cross = soma(pg.map(p => p.valor));
   const up = rk.length ? soma(rk.map(r => r.up)) : null;
   const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
   const atual = (m === MES_ATUAL);
@@ -463,7 +496,9 @@ function calcMes(D, m){
     tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
     exp: (cross != null && up != null && down != null) ? cross + up + down : null,
-    nVendas: vd.length
+    nVendas: null,
+    crossContratado: null,
+    nPag: pg.length
   };
 }
 
@@ -483,7 +518,7 @@ const METRICAS = [
   { id:'tmpChurn', label:'TMP (churn)',     span:'',   get:d=>d.tmpChurn, fmt:fmt2,    recon:'mes', sub:()=>'meses' },
   { id:'tmpAtivos',label:'TMP (ativos)',    span:'',   get:d=>d.tmpAtivos,fmt:fmt2,    recon:'mes', sub:()=>'meses' },
   { id:'down',     label:'Down Sell −',     span:'',   get:d=>d.down,     fmt:fmtBRL0, brl:true },
-  { id:'cross',    label:'Cross Sell +',    span:'',   get:d=>d.cross,    fmt:fmtBRL0, brl:true, sub:d=>d.nVendas?d.nVendas+' vendas':null },
+  { id:'cross',    label:'Cross Sell +',    span:'',   get:d=>d.cross,    fmt:fmtBRL0, brl:true, sub:d=>d.crossContratado!=null?('recebido · contratado R$ '+fmtBRL0(d.crossContratado)):(d.nPag!=null?(d.nPag+' pagamento'+(d.nPag===1?'':'s')+' no mês'):null) },
   { id:'up',       label:'Upsell +',        span:'',   get:d=>d.up,       fmt:fmtBRL0, brl:true },
   { id:'expansao', label:'Expansão de Receita', span:'s8', get:d=>d.exp,  fmt:fmtBRL0, brl:true,
     sub:()=>'crossell + upsell − downsell' }
@@ -686,10 +721,16 @@ function detalheDados(){
   }
 
   if (id === 'cross') {
-    const vs = (mes == null ? D.vendas.filter(v => v.y == null || v.y === ANO) : vendasMes(D, mes))
-      .slice().sort((a,b) => b.valor - a.valor);
-    return { cols:['Venda','Status','Data','Valor'], rows: vs.map(v => [v.nome, v.status || '—', dataBR(v.ts), din(v.valor)]),
-      resumo: vs.length + ' vendas · Σ ' + din(soma(vs.map(v => v.valor))) };
+    if (mes == null) {
+      const vs = D.vendas.filter(v => v.y == null || v.y === ANO).slice().sort((a,b) => b.valor - a.valor);
+      return { cols:['Venda','Status','Contratado','Pago'],
+        rows: vs.map(v => [v.nome, v.status || '—', din(v.valor), din(v.pago || 0)]),
+        resumo: vs.length + ' vendas · contratado ' + din(soma(vs.map(v => v.valor))) + ' · recebido ' + din(soma(vs.map(v => v.pago || 0))) };
+    }
+    const pg = pagMes(D, mes).slice().sort((a,b) => (b.ts||0) - (a.ts||0));
+    if (!pg.length) return { vazio: 'Nenhum pagamento recebido neste mês.' };
+    return { cols:['Pagamento','Data','Valor'], rows: pg.map(p => [p.nome, dataBR(p.ts), din(p.valor)]),
+      resumo: pg.length + (pg.length === 1 ? ' pagamento' : ' pagamentos') + ' · Σ ' + din(soma(pg.map(p => p.valor))) };
   }
 
   if (id === 'up' || id === 'down') {
@@ -730,7 +771,7 @@ function detalheDados(){
 
   const d = dadosPeriodo() || {};
   return { cols:['Componente','Valor'], rows: [
-    ['Cross Sell', din(d.cross)], ['Upsell', din(d.up)], ['Down Sell', din(d.down)], ['Expansão de Receita', din(d.exp)]],
+    ['Cross Sell (recebido)', din(d.cross)], ['Upsell', din(d.up)], ['Down Sell', din(d.down)], ['Expansão de Receita', din(d.exp)]],
     resumo: 'crossell + upsell − downsell' };
 }
 
