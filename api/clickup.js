@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
       headers: { Authorization: token, 'Content-Type': 'application/json' }
     });
     const body = await r.json();
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=60');
     return res.status(r.status).json(body);
   } catch (err) {
     return res.status(502).json({ error: 'Falha ao consultar o ClickUp', detail: String(err) });
