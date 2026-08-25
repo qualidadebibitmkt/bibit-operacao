@@ -1,5 +1,5 @@
 {
- "geradoEm": "2026-08-25T21:52:21.573764",
+ "geradoEm": "2026-08-25T21:58:58.349732",
  "linhas": [
   {
    "nome": "Mare Nostrum — Parcela 2/2 — R$ 5.500 (ago/26)",
@@ -34,20 +34,20 @@
   {
    "nome": "Parcela 3 — R$ 5.500",
    "valor": 5500.0,
-   "mes": "07/2026",
-   "data": "15/07/26"
+   "mes": "06/2026",
+   "data": "26/06/26"
   },
   {
    "nome": "Parcela 2 — R$ 3.300",
    "valor": 3300.0,
-   "mes": "07/2026",
-   "data": "15/07/26"
+   "mes": "06/2026",
+   "data": "14/06/26"
   },
   {
    "nome": "Parcela 1 — R$ 5.940",
    "valor": 5940.0,
-   "mes": "07/2026",
-   "data": "15/07/26"
+   "mes": "06/2026",
+   "data": "01/06/26"
   },
   {
    "nome": "PRESSKIT ROCK BREWING",
