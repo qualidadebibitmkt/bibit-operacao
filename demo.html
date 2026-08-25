@@ -374,7 +374,8 @@ function parseTudo(raw){
   };
   const foiPago = (t) => normaliza(t.status && t.status.status || t.status).includes('recebido');
   const valorItem = (t) => { const v = cfNum(t, CF.valorVenda); return (v != null && v > 0) ? v : (valorDoNome(t.name) || 0); };
-  const tsPagamento = (t) => cfNum(t, CF.dataPag) || cfNum(t, CF.dataVenc) || num(t.due_date) || num(t.date_closed) || num(t.date_created);
+  // data do pagamento = quando a parcela foi para 'encerrado/recebido' (date_closed)
+  const tsPagamento = (t) => num(t.date_closed) || cfNum(t, CF.dataPag) || cfNum(t, CF.dataVenc) || num(t.due_date) || num(t.date_created);
 
   const pais = raw.vendas.filter(t => !t.parent);
   const filhos = raw.vendas.filter(t => t.parent);
