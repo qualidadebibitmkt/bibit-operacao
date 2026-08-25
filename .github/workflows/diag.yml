@@ -1,0 +1,41 @@
+name: Diag Vendas
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolver projeto e baixar env
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          AUTH="Authorization: Bearer $VERCEL_TOKEN"
+          TEAMS=$(curl -s "https://api.vercel.com/v2/teams?limit=100" -H "$AUTH")
+          ORG_ID=$(echo "$TEAMS" | jq -r '.teams[]? | select(.slug=="bibit-marketing") | .id')
+          echo "VERCEL_ORG_ID=$ORG_ID" >> $GITHUB_ENV
+          echo "VERCEL_PROJECT_ID=prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ" >> $GITHUB_ENV
+      - name: Puxar vendas do ClickUp e gravar relatório
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          npx vercel@latest pull --yes --environment=production --token=$VERCEL_TOKEN
+          export $(grep CLICKUP_TOKEN .vercel/.env.production.local | tr -d '"')
+          curl -s "https://api.clickup.com/api/v2/list/901713519081/task?include_closed=true&subtasks=true" \
+            -H "Authorization: $CLICKUP_TOKEN" | jq '[.tasks[] | {
+              id, name, parent,
+              status: .status.status,
+              created: .date_created, closed: .date_closed, due: .due_date,
+              vv:  (first(.custom_fields[]? | select(.id=="01454349-1cb6-4e8a-a665-7d7e74420d64") | .value) // null),
+              dp:  (first(.custom_fields[]? | select(.id=="435d3c37-e413-4362-9c21-bdba5b6473d0") | .value) // null),
+              vpa: (first(.custom_fields[]? | select(.id=="3482e7a2-3a3c-4214-a8bc-bae71a56eab3") | .value) // null)
+            }]' > diag-vendas.json
+          wc -c diag-vendas.json
+          git config user.name "diag-bot"; git config user.email "bot@bibit"
+          git add diag-vendas.json
+          git commit -m "diag: snapshot vendas [skip ci]" || true
+          git push || true
