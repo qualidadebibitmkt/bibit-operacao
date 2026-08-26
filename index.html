@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>25/08 22:18</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>26/08 14:30</b></div>
   </div>
 </aside>
 
@@ -423,7 +423,7 @@ function parseTudo(raw){
   });
 
   const g = {}; for (const [k, id] of Object.entries(CF)) g[k] = cfNum(raw.card2026, id);
-  return { clientes, vendas, pagamentos, respostas, ranking, geral: g };
+  return { clientes, vendas, pagamentos, respostas, ranking, geral: g, _dbg: { vendasRaw: raw.vendas.length, parcelasRaw: filhos.length, paisRaw: pais.length } };
 }
 
 /* ---------------- cálculo ---------------- */
@@ -799,7 +799,7 @@ function renderDetalhe(){
 }
 
 /* ---------------- ciclo ---------------- */
-function renderTudo(){ renderTitulo(); renderPeriodos(); renderGrid(); renderChart(); }
+function renderTudo(){ renderTitulo(); renderPeriodos(); renderGrid(); renderChart(); renderDebug(); }
 
 function computa(D){
   state.D = D;
@@ -835,6 +835,26 @@ async function carrega(){
 }
 
 $('#btn-refresh').onclick = () => { state.bust = Date.now(); carrega(); };
+
+function renderDebug(){
+  if (!/debug/.test(location.search + location.hash)) return;
+  let box = document.getElementById('debugbox');
+  if (!box) { box = document.createElement('pre'); box.id = 'debugbox';
+    box.style.cssText = 'margin-top:18px;padding:14px;border:1px dashed #c89b76;border-radius:12px;color:#eee7df;font:11px/1.7 monospace;white-space:pre-wrap;background:#141a15';
+    document.querySelector('main').appendChild(box); }
+  const D = state.D || {};
+  const dbg = D._dbg || {};
+  const pj = (D.pagamentos || []).filter(p => p.y === 2026);
+  const porMes = {};
+  pj.forEach(p => { const k = (p.m + 1) + '/2026'; porMes[k] = (porMes[k] || 0) + p.valor; });
+  const jun = pj.filter(p => p.m === 5).map(p => '  ' + p.nome.slice(0, 55) + ' | R$ ' + p.valor + ' | ' + (p.ts ? new Date(p.ts).toLocaleDateString('pt-BR') : '—'));
+  box.textContent =
+    'DEBUG ' + document.querySelector('.sync').textContent.replace(/\s+/g, ' ') + '\n' +
+    'demo? ' + (window.BIBIT_DEMO_DATA ? 'SIM' : 'não') + '\n' +
+    'vendas cruas: ' + (dbg.vendasRaw ?? '?') + ' (' + (dbg.paisRaw ?? '?') + ' pais + ' + (dbg.parcelasRaw ?? '?') + ' parcelas)\n' +
+    'pagamentos 2026: ' + pj.length + ' → ' + JSON.stringify(porMes) + '\n' +
+    'JUNHO (' + jun.length + '):\n' + (jun.join('\n') || '  vazio');
+}
 $('#modal-x').onclick = fecharDetalhe;
 $('#modal-bg').addEventListener('click', (e) => { if (e.target === e.currentTarget) fecharDetalhe(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharDetalhe(); });
