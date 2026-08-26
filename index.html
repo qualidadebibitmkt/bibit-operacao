@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>26/08 14:30</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>26/08 14:35</b></div>
   </div>
 </aside>
 
@@ -821,7 +821,7 @@ async function carrega(){
     }
     state.D = null; renderTudo(); // skeleton
     const [growth, vendas, csat, ranking, card2026] = await Promise.all([
-      fetchTasks(LISTA.growth), fetchTasks(LISTA.vendas), fetchTasks(LISTA.csat), fetchTasks(LISTA.ranking), fetchJSON('task/' + CARD_2026 + '?include_subtasks=false')
+      fetchTasks(LISTA.growth), fetchTasks(LISTA.vendas, true), fetchTasks(LISTA.csat), fetchTasks(LISTA.ranking), fetchJSON('task/' + CARD_2026 + '?include_subtasks=false')
     ]);
     computa(parseTudo({ growth, vendas, csat, ranking, card2026 }));
     $('#sync-ts').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
