@@ -1,6 +1,6 @@
 proxy principal: 200
 proxy duplicado: 200
-data: 2026-08-31T23:18:13Z
+data: 2026-08-31T23:22:01Z
 --- token ---
 org: team_SSWS3HUzlxGBMf5fJZNet6Z7
 teste do token recebido no ClickUp: 200
@@ -20,14 +20,14 @@ prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v: env gravada
 --- deploys ---
 == prj_ItDvOpwDIanwajqFHo8t9VsEXgIQ ==
 Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/project.json [0ms]
-  Production      https://qualidadebibitmkt-bibit-operacao-lj6gudu9m-bibit-marketing.vercel.app
-[2K[1A[2K[G  Production      https://qualidadebibitmkt-bibit-operacao-lj6gudu9m-bibit-marketing.vercel.app
+  Production      https://qualidadebibitmkt-bibit-operacao-gu412o8gv-bibit-marketing.vercel.app
+[2K[1A[2K[G  Production      https://qualidadebibitmkt-bibit-operacao-gu412o8gv-bibit-marketing.vercel.app
 ▲ Aliased         https://qualidadebibitmkt-bibit-operacao.vercel.app
 == prj_wSVUHcdyD74lUrrQ0xYfbYNxtc3v ==
 Downloaded project settings to ~/work/bibit-operacao/bibit-operacao/.vercel/project.json [0ms]
-  Production      https://bibit-operacao-483r54xgj-bibit-marketing.vercel.app
-[2K[1A[2K[G  Production      https://bibit-operacao-483r54xgj-bibit-marketing.vercel.app
+  Production      https://bibit-operacao-ra0evh93m-bibit-marketing.vercel.app
+[2K[1A[2K[G  Production      https://bibit-operacao-ra0evh93m-bibit-marketing.vercel.app
 ▲ Aliased         https://bibit-operacao.vercel.app
 --- sonda ---
-qualidadebibitmkt-bibit-operacao html: 67010 bytes sha:50b616e20210
-bibit-operacao html: 67010 bytes sha:50b616e20210
+qualidadebibitmkt-bibit-operacao html: 67106 bytes sha:1676d1c5d793
+bibit-operacao html: 67106 bytes sha:1676d1c5d793
