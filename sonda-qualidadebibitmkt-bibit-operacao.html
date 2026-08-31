@@ -509,6 +509,43 @@ function calcMes(D, m){
   };
 }
 
+/* ---------------- trimestre (31/08/26, pedido do Bruno) ---------------- */
+function calcTri(D, q){                                  // q = 0..3 → meses q*3 .. q*3+2
+  const m0 = q * 3, m1 = Math.min(q * 3 + 2, MES_ATUAL);
+  if (m1 < MES_INICIO || m0 > MES_ATUAL) return null;
+  const a0 = Math.max(m0, MES_INICIO);
+  const fim = fimMes(m1), aoVivo = (m1 === MES_ATUAL);
+  const ativos = aoVivo ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
+  const mrr = soma(ativos.map(c => c.vr));
+  const mrrIni = soma(ativosEm(D, iniMes(a0) - 1).map(c => c.vr));
+  const janela = []; for (let m = a0; m <= m1; m++) janela.push(m);
+  const chT = janela.flatMap(m => churnNoMes(D, m));
+  const churnRS = soma(chT.map(c => c.vr));
+  const rk = janela.flatMap(m => rankMes(D, m)), rs = janela.flatMap(m => respMes(D, m)), pg = janela.flatMap(m => pagMes(D, m));
+  const chAcum = churnAte(D, m1);
+  const cross = soma(pg.map(p => p.valor));
+  const up = rk.length ? soma(rk.map(r => r.up)) : null;
+  const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
+  return {
+    ativos: ativos.length, mrr,
+    ticket: ativos.length ? mrr / ativos.length : null,
+    nrr: null,
+    prod: media(rk.map(r => r.prod)),
+    nps: media(rs.map(r => r.nps)),
+    csat: media(rs.map(r => r.csat)),
+    ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
+    churnRS, churnN: chT.length,
+    churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
+    tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
+    tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
+    down, cross, up,
+    exp: (cross != null && up != null && down != null) ? cross + up + down : null,
+    nVendas: null, crossContratado: null, nPag: pg.length
+  };
+}
+const triDe = p => (typeof p === 'string' && p[0] === 'q') ? +p.slice(1) : null;   // 'q0'..'q3'
+const mesFimTri = q => Math.min(q * 3 + 2, MES_ATUAL);
+
 /* ---------------- métricas (mesmos 17 cards do ClickUp) ---------------- */
 const METRICAS = [
   { id:'ativos',   label:'Clientes Ativos', span:'s5', get:d=>d.ativos,   fmt:fmtInt,  recon:true,  sub:d=>'carteira growth' },
@@ -548,10 +585,14 @@ function metaEstado(id, v){
 }
 
 /* ---------------- estado + render ---------------- */
-const state = { periodo:'acc', metric:'mrr', D:null, acc:null, meses:[], bust:0 };
+const state = { periodo:'acc', metric:'mrr', D:null, acc:null, meses:[], tris:[], bust:0 };
 
-function dadosPeriodo(){ return state.periodo === 'acc' ? state.acc : state.meses[state.periodo]; }
-function dadosAnterior(){ return (state.periodo === 'acc' || state.periodo <= MES_INICIO) ? null : state.meses[state.periodo - 1]; }
+function dadosPeriodo(){ const q = triDe(state.periodo); return state.periodo === 'acc' ? state.acc : (q != null ? state.tris[q] : state.meses[state.periodo]); }
+function dadosAnterior(){
+  const q = triDe(state.periodo);
+  if (q != null) return q > 0 ? state.tris[q - 1] : null;           // trimestre compara com o trimestre anterior
+  return (state.periodo === 'acc' || state.periodo <= MES_INICIO) ? null : state.meses[state.periodo - 1];
+}
 
 function renderPeriodos(){
   const box = $('#periodos'); box.innerHTML = '';
@@ -563,11 +604,14 @@ function renderPeriodos(){
     box.appendChild(b);
   };
   mk('Acumulado', 'acc', false);
+  const TRI_ATUAL = Math.floor(MES_ATUAL / 3);
+  for (let q = 0; q < 4; q++) mk('T' + (q + 1), 'q' + q, q > TRI_ATUAL || !state.tris[q]);
   MESES.forEach((mn, i) => mk(mn, i, i < MES_INICIO || i > MES_ATUAL || !state.meses[i]));
 }
 
 function renderTitulo(){
   if (state.periodo === 'acc') { $('#titulo').firstChild.textContent = 'Acumulado '; $('#titulo-sub').textContent = String(ANO); }
+  else if (triDe(state.periodo) != null) { $('#titulo').firstChild.textContent = (triDe(state.periodo) + 1) + '\u00ba trimestre '; $('#titulo-sub').textContent = String(ANO); }
   else {
     const n = MESES_FULL[state.periodo];
     $('#titulo').firstChild.textContent = n.charAt(0).toUpperCase() + n.slice(1) + ' ';
@@ -661,7 +705,8 @@ function renderChart(){
   pts.forEach((p, i) => {
     labels += `<text x="${Xc(i)}" y="${H - 10}" fill="rgba(238,231,223,.4)" font-family="Spline Sans Mono" font-size="10" text-anchor="middle">${MESES[p.m]}</text>`;
     if (p.v == null) return;
-    const selMes = state.periodo === p.m;
+    const q = triDe(state.periodo);
+    const selMes = state.periodo === p.m || (q != null && p.m >= q * 3 && p.m <= q * 3 + 2);
     const yTop = Math.min(Y(p.v), y0 - 2);
     bars += `<rect data-i="${i}" x="${Xc(i) - barW / 2}" y="${yTop}" width="${barW}" height="${Math.max(2, y0 - yTop)}" rx="4" fill="${selMes ? '#c89b76' : '#5e9b78'}" fill-opacity="${selMes ? 1 : 0.82}" style="cursor:pointer"/>`;
   });
@@ -688,7 +733,9 @@ function renderChart(){
 function detalheDados(){
   const D = state.D; if (!D) return null;
   const id = state.metric;
-  const mes = state.periodo === 'acc' ? null : state.periodo;
+  const triQ = triDe(state.periodo);
+  const mes = state.periodo === 'acc' ? null : (triQ != null ? mesFimTri(triQ) : state.periodo);   // tri: fotografias no fim do tri
+  const mesesJanela = mes == null ? null : (triQ != null ? Array.from({ length: mes - triQ * 3 + 1 }, (_, k) => triQ * 3 + k).filter(m => m >= MES_INICIO) : [mes]);
   const fim = mes == null ? Date.now() : fimMes(mes);
   const din  = v => v == null ? '—' : 'R$ ' + fmtBRL0(v);
   const din2 = v => v == null ? '—' : 'R$ ' + fmtBRL2(v);
@@ -708,11 +755,11 @@ function detalheDados(){
   }
 
   if (['churnRS','churnN','churnPct','tmpChurn'].includes(id)) {
-    const chs = mes == null ? D.clientes.filter(c => c.status === 'churn') : churnNoMes(D, mes);
+    const chs = mes == null ? D.clientes.filter(c => c.status === 'churn') : mesesJanela.flatMap(m => churnNoMes(D, m));
     const rows = chs.slice().sort((a,b) => (b.saida||0) - (a.saida||0))
       .map(c => [c.nome, din(c.vr), dataBR(c.saida), fmt2(c.tmp != null ? c.tmp : ((c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null))]);
     const tot = soma(chs.map(c => c.vr));
-    const base = mes == null ? (D.geral.mrrAcum || null) : soma(ativosEm(D, iniMes(mes) - 1).map(c => c.vr));
+    const base = mes == null ? (D.geral.mrrAcum || null) : soma(ativosEm(D, iniMes(mesesJanela[0]) - 1).map(c => c.vr));
     return { cols:['Cliente','Valor Recorrente','Saída','TMP (meses)'], rows,
       resumo: chs.length + (chs.length === 1 ? ' churn' : ' churns') + ' · ' + din(tot) +
         (base ? ' · ' + fmt2(tot / base * 100) + '% sobre base ' + din(base) : '') };
@@ -725,7 +772,7 @@ function detalheDados(){
         rows: vs.map(v => [v.nome, v.status || '—', din(v.valor), din(v.pago || 0)]),
         resumo: vs.length + ' vendas · contratado ' + din(soma(vs.map(v => v.valor))) + ' · recebido ' + din(soma(vs.map(v => v.pago || 0))) };
     }
-    const pg = pagMes(D, mes).slice().sort((a,b) => (b.ts||0) - (a.ts||0));
+    const pg = mesesJanela.flatMap(m => pagMes(D, m)).sort((a,b) => (b.ts||0) - (a.ts||0));
     if (!pg.length) return { vazio: 'Nenhum pagamento recebido neste mês.' };
     return { cols:['Pagamento','Data','Valor'], rows: pg.map(p => [p.nome, dataBR(p.ts), din(p.valor)]),
       resumo: pg.length + (pg.length === 1 ? ' pagamento' : ' pagamentos') + ' · Σ ' + din(soma(pg.map(p => p.valor))) };
@@ -738,13 +785,13 @@ function detalheDados(){
       return { cols:['Cliente','Valor'], rows: cls.map(c => [c.nome, din(id === 'down' ? negDown(c[id]) : Math.abs(c[id]))]),
         resumo: cls.length + (cls.length === 1 ? ' registro' : ' registros') + ' · Σ ' + din(id === 'down' ? -tot : tot) + ' · fonte: campos dos clientes (Growth)' };
     }
-    const rk = rankMes(D, mes).filter(r => r[id]);
+    const rk = mesesJanela.flatMap(m => rankMes(D, m)).filter(r => r[id]);
     return { cols:['Colaborador','Valor'], rows: rk.map(r => [r.nome || '—', din(id === 'down' ? negDown(r[id]) : Math.abs(r[id]))]),
       resumo: rk.length + (rk.length === 1 ? ' registro' : ' registros') + ' · fonte: cards do Ranking' };
   }
 
   if (id === 'prod') {
-    const rk = (mes == null ? D.ranking.filter(r => r.y === ANO) : rankMes(D, mes)).filter(r => r.prod != null);
+    const rk = (mes == null ? D.ranking.filter(r => r.y === ANO) : mesesJanela.flatMap(m => rankMes(D, m))).filter(r => r.prod != null);
     const rows = rk.slice().sort((a,b) => b.prod - a.prod)
       .map(r => [r.nome || '—', MESES[r.m], fmtInt(r.tot), fmtInt(r.atr), fmt2(r.prod) + '%']);
     return { cols:['Colaborador','Mês','Tarefas','Atrasadas','%'], rows,
@@ -797,6 +844,7 @@ function computa(D){
   state.acc = calcAcumulado(D);
   state.meses = [];
   for (let m = 0; m < 12; m++) state.meses[m] = calcMes(D, m);
+  state.tris = [0, 1, 2, 3].map(q => calcTri(D, q));
 }
 
 async function carrega(){

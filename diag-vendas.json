@@ -1,6 +1,12 @@
 {
- "geradoEm": "2026-08-31T22:40:12.606125",
+ "geradoEm": "2026-08-31T23:17:56.714544",
  "linhas": [
+  {
+   "nome": "Parcela — R$ 5.500 (27/08)",
+   "valor": 5500.0,
+   "mes": "08/2026",
+   "data": "27/08/26"
+  },
   {
    "nome": "Sub-rótulo Mare Nostrum - Maracujá",
    "valor": 1500.0,
@@ -12,6 +18,12 @@
    "valor": 5940.0,
    "mes": "06/2026",
    "data": "02/06/26"
+  },
+  {
+   "nome": "Registro de marca INPI",
+   "valor": 11000.0,
+   "mes": "08/2026",
+   "data": "31/08/26"
   },
   {
    "nome": "Mare Nostrum — Parcela 2/2 — R$ 5.500 (ago/26)",
