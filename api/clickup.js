@@ -7,7 +7,8 @@ const ALLOW = [
   /^list\/901713519081\/task/,   // Cross-Sell (vendas)
   /^list\/901713333681\/task/,   // CSAT - Envios (CSAT + NPS)
   /^list\/901713545639\/task/,   // Ranking (produtividade / up-down mensais)
-  /^task\/86e1fwefa/             // Card 2026 (métricas gerais)
+  /^task\/86e1fwefa/,            // Card 2026 (métricas gerais)
+  /^team\/90171091630\/task/     // Tarefas da operação (atrasadas abertas — spaces filtrados na query)
 ];
 
 module.exports = async (req, res) => {
