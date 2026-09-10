@@ -470,6 +470,15 @@ function churnAte(D, m){ return D.clientes.filter(c => c.status === 'churn' && c
 function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() === m); }
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
 /* Churn % do mês = churn R$ do mês ÷ MRR do início do mês (mesma conta do calcMes). */
+// NRR mensal calculado (10/09/26, Bruno): (MRR início do mês + upsell + downsell − churn R$) ÷ MRR início do mês.
+// Cross-sell fica FORA (é pontual, nunca recorrente). Usado para o NRR dos trimestres = média dos meses.
+function nrrMes(D, m){
+  const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); if (!base) return null;
+  const rk = rankMes(D, m);
+  const up = soma(rk.map(r => r.up)), down = negDown(soma(rk.map(r => r.down))) || 0;
+  const churn = soma(churnNoMes(D, m).map(c => c.vr));
+  return ((base + up + down - churn) / base) * 100;
+}
 function churnPctMes(D, m){ const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); return base ? (soma(churnNoMes(D, m).map(c => c.vr)) / base) * 100 : null; }
 const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
 const atrAno = (D) => (D.atrasadas || []);
@@ -572,11 +581,13 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
   const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
   // Churn % do trimestre (10/09/26, Bruno): MÉDIA SIMPLES dos churn % mensais — fica na escala da meta mensal (≤ 5%).
   const churnPctMeses = janela.map(m => ({ m, pct: churnPctMes(D, m) }));
+  // NRR do trimestre (10/09/26, Bruno): MÉDIA SIMPLES dos NRRs mensais calculados (meses sem base ficam fora da média).
+  const nrrMeses = janela.map(m => ({ m, v: nrrMes(D, m) }));
   return {
-    meses: janela, churnPctMeses,
+    meses: janela, churnPctMeses, nrrMeses,
     ativos: ativos.length, mrr,
     ticket: ativos.length ? mrr / ativos.length : null,
-    nrr: null,
+    nrr: media(nrrMeses.map(x => x.v)),
     prod: prodAgregada(rk),
     atrasadas: janela.flatMap(m => atrMes(D, m)).length,
     nps: media(rs.map(r => r.nps)),
@@ -873,6 +884,15 @@ function detalheDados(){
       resumo: rs.length + ' respostas · CSAT médio ' + fmt2(media(rs.map(r => r.csat))) + ' · NPS médio ' + fmt2(media(rs.map(r => r.nps))) };
   }
 
+  if (id === 'nrr' && triQ != null) {
+    const t = dadosPeriodo() || {};
+    const rows = (t.nrrMeses || []).map(x => {
+      const base = soma(ativosEm(D, iniMes(x.m) - 1).map(c => c.vr)), rk = rankMes(D, x.m);
+      return [MESES[x.m], din(base), din(soma(rk.map(r => r.up))), din(negDown(soma(rk.map(r => r.down))) || 0), din(soma(churnNoMes(D, x.m).map(c => c.vr))), x.v == null ? '—' : fmt2(x.v) + '%'];
+    });
+    return { cols:['Mês','MRR início','Upsell','Downsell','Churn R$','NRR'], rows,
+      resumo: 'NRR do trimestre = média dos meses = ' + (t.nrr == null ? '—' : fmt2(t.nrr) + '%') + ' · NRR mês = (MRR início + up + down − churn) ÷ MRR início · cross-sell fora' };
+  }
   if (id === 'nrr') {
     return { cols:['Métrica','Valor','Fonte'], rows: [
       ['NRR Anual', D.geral.nrrAnual != null ? fmt2(D.geral.nrrAnual) + '%' : '—', 'card 2026'],
