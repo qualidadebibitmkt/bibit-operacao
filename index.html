@@ -598,7 +598,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     csat: media(rs.map(r => r.csat)),
     ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
     churnRS, churnN: chT.length,
-    churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,   // R$ perdido no trimestre ÷ MRR do início do trimestre
+    churnPct: media(churnPctMeses.map(x => x.pct)),   // TRIMESTRE (10/09/26, Bruno, decisão final): MÉDIA SIMPLES dos churn % mensais
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
     tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
@@ -834,6 +834,9 @@ function detalheDados(){
       const ms = mesesExibidos(), b = soma(ativosEm(D, iniMes(ms[0]) - 1).map(c => c.vr));
       const perdido = soma(ms.flatMap(m => churnNoMes(D, m)).map(c => c.vr));
       pctTxt = ' · churn % = R$ perdido ' + MESES[ms[0]] + '–' + MESES[ms[ms.length - 1]] + ' ' + din(perdido) + ' ÷ MRR em ' + dataBR(iniMes(ms[0]) - 1) + ' ' + din(b) + (b ? ' = ' + fmt2(perdido / b * 100) + '%' : '');
+    } else if (triQ != null) {
+      const pm = mesesJanela.map(m => ({ m, pct: churnPctMes(D, m) }));
+      pctTxt = ' · churn % = média dos meses (' + pm.map(x => MESES[x.m] + ' ' + (x.pct == null ? '—' : fmt2(x.pct) + '%')).join(', ') + ') = ' + fmt2(media(pm.map(x => x.pct))) + '%';
     } else pctTxt = ' · churn % = ' + din(tot) + ' ÷ MRR em ' + dataBR(iniMes(mesesJanela[0]) - 1) + ' ' + din(base) + (base ? ' = ' + fmt2(tot / base * 100) + '%' : '');
     return { cols:['Cliente','Valor Recorrente','Saída','TMP (meses)'], rows,
       resumo: chs.length + (chs.length === 1 ? ' churn' : ' churns') + ' · ' + din(tot) + pctTxt };
