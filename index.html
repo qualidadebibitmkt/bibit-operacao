@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 15:50</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 16:35</b></div>
   </div>
 </aside>
 
@@ -469,6 +469,7 @@ function ativosEm(D, ts){ return D.clientes.filter(c => c.entrada && c.entrada <
 function churnAte(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() <= m); }
 function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() === m); }
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
+const mesesExibidos = () => { const a = []; for (let m = MES_INICIO; m <= MES_ATUAL; m++) a.push(m); return a; };
 /* Churn % do mês = churn R$ do mês ÷ MRR do início do mês (mesma conta do calcMes). */
 // NRR mensal calculado (10/09/26, Bruno): (MRR início do mês + upsell + downsell − churn R$) ÷ MRR início do mês.
 // Cross-sell fica FORA (é pontual, nunca recorrente). Usado para o NRR dos trimestres = média dos meses.
@@ -514,7 +515,9 @@ function calcAcumulado(D){
     csat: media(respAno.map(r => r.csat)),
     ltv: media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)),
     churnRS, churnN: churn.length,
-    churnPct: mrrBaseChurn ? (churnRS / mrrBaseChurn) * 100 : null,
+    // ACUMULADO (10/09/26, Bruno): churn % = R$ perdido nos meses exibidos ÷ MRR do início do período
+    // (carteira antes dessas saídas) — sem usar o acumulado do card 2026; mesma régua dos trimestres e dos individuais.
+    churnPct: (() => { const ms = mesesExibidos(); const base = soma(ativosEm(D, iniMes(ms[0]) - 1).map(c => c.vr)); const perdido = soma(ms.flatMap(m => churnNoMes(D, m)).map(c => c.vr)); return base ? (perdido / base) * 100 : null; })(),
     tmpChurn: media(churn.map(c => c.tmp != null ? c.tmp : (c.entrada && c.saida ? mesesEntre(c.entrada, c.saida) : null))),
     tmpAtivos: media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))),
     down, cross, up,
@@ -594,7 +597,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     csat: media(rs.map(r => r.csat)),
     ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
     churnRS, churnN: chT.length,
-    churnPct: media(churnPctMeses.map(x => x.pct)),
+    churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,   // R$ perdido no trimestre ÷ MRR do início do trimestre
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
     tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
@@ -826,10 +829,11 @@ function detalheDados(){
     const tot = soma(chs.map(c => c.vr));
     const base = mes == null ? (D.geral.mrrAcum || null) : soma(ativosEm(D, iniMes(mesesJanela[0]) - 1).map(c => c.vr));
     let pctTxt = base ? ' · ' + fmt2(tot / base * 100) + '% sobre base ' + din(base) : '';
-    if (triQ != null) {
-      const pm = mesesJanela.map(m => ({ m, pct: churnPctMes(D, m) }));
-      pctTxt = ' · churn % = média dos meses (' + pm.map(x => MESES[x.m] + ' ' + (x.pct == null ? '—' : fmt2(x.pct) + '%')).join(', ') + ') = ' + fmt2(media(pm.map(x => x.pct))) + '%';
-    }
+    if (mes == null) {
+      const ms = mesesExibidos(), b = soma(ativosEm(D, iniMes(ms[0]) - 1).map(c => c.vr));
+      const perdido = soma(ms.flatMap(m => churnNoMes(D, m)).map(c => c.vr));
+      pctTxt = ' · churn % = R$ perdido ' + MESES[ms[0]] + '–' + MESES[ms[ms.length - 1]] + ' ' + din(perdido) + ' ÷ MRR em ' + dataBR(iniMes(ms[0]) - 1) + ' ' + din(b) + (b ? ' = ' + fmt2(perdido / b * 100) + '%' : '');
+    } else pctTxt = ' · churn % = ' + din(tot) + ' ÷ MRR em ' + dataBR(iniMes(mesesJanela[0]) - 1) + ' ' + din(base) + (base ? ' = ' + fmt2(tot / base * 100) + '%' : '');
     return { cols:['Cliente','Valor Recorrente','Saída','TMP (meses)'], rows,
       resumo: chs.length + (chs.length === 1 ? ' churn' : ' churns') + ' · ' + din(tot) + pctTxt };
   }
