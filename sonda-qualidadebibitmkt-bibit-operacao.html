@@ -327,6 +327,9 @@ function mesDoCardRanking(task){
   const d = new Date(Number(task.date_created)); return { m: d.getMonth(), y: d.getFullYear() };
 }
 
+/* Produtividade agregada do time: soma tarefas e atrasadas de TODOS antes de dividir
+   (não é média dos % individuais — quem tem mais tarefas pesa mais). */
+const prodAgregada = (rk) => { const v = rk.filter(r => r && r.tot > 0); const tot = v.reduce((a, r) => a + r.tot, 0); if (!tot) return null; const atr = v.reduce((a, r) => a + (r.atr || 0), 0); return ((tot - atr) / tot) * 100; };
 const media = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 const soma  = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) : 0; };
 const mesesEntre = (a, b) => (b - a) / (1000 * 60 * 60 * 24 * 30.44);
@@ -494,7 +497,7 @@ function calcAcumulado(D){
     mrr,
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: D.geral.nrrAnual,
-    prod: D.geral.prodAnual != null ? D.geral.prodAnual : media(rankAno.map(r => r.prod)),
+    prod: D.geral.prodAnual != null ? D.geral.prodAnual : prodAgregada(rankAno),
     atrasadas: atrAno(D).length,
     nps: media(respAno.map(r => r.nps)),
     csat: media(respAno.map(r => r.csat)),
@@ -531,7 +534,7 @@ function calcMes(D, m){
     mrr,
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: atual ? D.geral.nrrMensal : null,
-    prod: media(rk.map(r => r.prod)),
+    prod: prodAgregada(rk),
     atrasadas: atrMes(D, m).length,
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
@@ -569,7 +572,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     ativos: ativos.length, mrr,
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: null,
-    prod: media(rk.map(r => r.prod)),
+    prod: prodAgregada(rk),
     atrasadas: janela.flatMap(m => atrMes(D, m)).length,
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
@@ -837,7 +840,7 @@ function detalheDados(){
       .map(r => [r.nome || '—', MESES[r.m], fmtInt(r.tot), fmtInt(r.atr), fmt2(r.prod) + '%']);
     return { cols:['Colaborador','Mês','Tarefas','Atrasadas','%'], rows,
       resumo: (mes == null && D.geral.prodAnual != null ? 'anual oficial ' + D.geral.prodAnual + '% (card 2026) · ' : '') +
-        'média da tabela ' + fmt2(media(rk.map(r => r.prod))) + '%' };
+        'geral agregada ' + fmt2(prodAgregada(rk)) + '% (' + fmtInt(soma(rk.map(r => r.atr))) + ' atrasadas de ' + fmtInt(soma(rk.map(r => r.tot))) + ' tarefas) · média simples dos % ' + fmt2(media(rk.map(r => r.prod))) + '%' };
   }
 
   if (id === 'atrasadas') {
