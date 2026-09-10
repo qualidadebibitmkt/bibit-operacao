@@ -549,7 +549,8 @@ function calcMes(D, m){
     ativos: ativos.length,
     mrr,
     ticket: ativos.length ? mrr / ativos.length : null,
-    nrr: atual ? D.geral.nrrMensal : null,
+    // NRR mensal (10/09/26, Bruno): calculado da Growth/Ranking em TODOS os meses (antes só o mês corrente lia o card 2026)
+    nrr: nrrMes(D, m),
     prod: prodAgregada(rk),
     atrasadas: atrMes(D, m).length,
     nps: media(rs.map(r => r.nps)),
@@ -889,14 +890,16 @@ function detalheDados(){
       resumo: rs.length + ' respostas · CSAT médio ' + fmt2(media(rs.map(r => r.csat))) + ' · NPS médio ' + fmt2(media(rs.map(r => r.nps))) };
   }
 
-  if (id === 'nrr' && triQ != null) {
+  if (id === 'nrr' && mes != null) {
     const t = dadosPeriodo() || {};
-    const rows = (t.nrrMeses || []).map(x => {
+    const lista = triQ != null ? (t.nrrMeses || []) : [{ m: mes, v: t.nrr }];
+    const rows = lista.map(x => {
       const base = soma(ativosEm(D, iniMes(x.m) - 1).map(c => c.vr)), rk = rankMes(D, x.m);
       return [MESES[x.m], din(base), din(soma(pagMes(D, x.m).map(p => p.valor))), din(soma(rk.map(r => r.up))), din(negDown(soma(rk.map(r => r.down))) || 0), din(soma(churnNoMes(D, x.m).map(c => c.vr))), x.v == null ? '—' : fmt2(x.v) + '%'];
     });
+    const cardTxt = (mes === MES_ATUAL && D.geral.nrrMensal != null) ? ' · card 2026 (Make): ' + fmt2(D.geral.nrrMensal) + '%' : '';
     return { cols:['Mês','MRR início','Cross (recebido)','Upsell','Downsell','Churn R$','NRR'], rows,
-      resumo: 'NRR do trimestre = média dos meses = ' + (t.nrr == null ? '—' : fmt2(t.nrr) + '%') + ' · NRR mês = (MRR início + cross recebido + up + down − churn) ÷ MRR início' };
+      resumo: (triQ != null ? 'NRR do trimestre = média dos meses = ' + (t.nrr == null ? '—' : fmt2(t.nrr) + '%') + ' · ' : '') + 'NRR mês = (MRR início + cross recebido + up + down − churn) ÷ MRR início' + cardTxt };
   }
   if (id === 'nrr') {
     return { cols:['Métrica','Valor','Fonte'], rows: [
