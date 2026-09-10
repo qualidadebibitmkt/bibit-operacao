@@ -238,6 +238,12 @@ const LISTA = {
 };
 const CARD_2026 = '86e1fwefa';
 
+/* Tarefas atrasadas (abertas e vencidas) — mesma régua do cenário "Produtividade Diária" (5470796):
+   spaces da operação, subtarefas incluídas, Cross-Sell (parcelas) fora, base anual desde 01/07/26. */
+const TEAM_ID = '90171091630';
+const SPACES_OPERACAO = ['90175021734','90175021364','90175433025','90175545288'];
+const BASE_ATRASO = new Date(2026, 6, 1).getTime();   // 01/07/2026
+
 const CF = {
   // Growth (clientes)
   vr:      '65f9eee2-b80d-4a6b-959f-61395ae91b02',
@@ -347,6 +353,22 @@ async function fetchTasks(listId, incluirSub){
   return out;
 }
 
+async function fetchAtrasadas(){
+  const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  const qs = SPACES_OPERACAO.map(id => 'space_ids[]=' + id).join('&') +
+    '&subtasks=true&include_closed=false&due_date_gt=' + (BASE_ATRASO - 1) + '&due_date_lt=' + (hoje0.getTime() - 1);
+  let page = 0, out = [];
+  while (true) {
+    const j = await fetchJSON(`team/${TEAM_ID}/task?${qs}&page=${page}`);
+    const t = j.tasks || [];
+    out = out.concat(t);
+    if (t.length < 100) break;
+    page++;
+    if (page > 30) break;
+  }
+  return out;
+}
+
 /* ---------------- parse ---------------- */
 function parseTudo(raw){
   const clientes = raw.growth.map(t => {
@@ -424,8 +446,19 @@ function parseTudo(raw){
     return { nome: t.name, m: per.m, y: per.y, tot, atr: atr || 0, prod: (tot && tot > 0) ? ((tot - (atr || 0)) / tot) * 100 : null, up: cfNum(t, CF.upMes) || 0, down: cfNum(t, CF.downMes) || 0 };
   });
 
+  const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+  const atrasadas = (raw.atrasadas || []).filter(t => {
+    const tipo = t.status && t.status.type;
+    return t.list && t.list.id !== LISTA.vendas && tipo !== 'done' && tipo !== 'closed' && t.due_date;
+  }).map(t => {
+    const due = Number(t.due_date), d = new Date(due);
+    return { nome: t.name, lista: t.list && t.list.name || '—', status: t.status && t.status.status || '—',
+      quem: (t.assignees || []).map(a => a.username).join(', ') || '—', due, m: d.getMonth(), y: d.getFullYear(),
+      dias: Math.max(0, Math.floor((hoje0.getTime() - due) / 86400000)), url: t.url };
+  });
+
   const g = {}; for (const [k, id] of Object.entries(CF)) g[k] = cfNum(raw.card2026, id);
-  return { clientes, vendas, pagamentos, respostas, ranking, geral: g, _dbg: { vendasRaw: raw.vendas.length, parcelasRaw: filhos.length, paisRaw: pais.length } };
+  return { clientes, vendas, pagamentos, respostas, ranking, atrasadas, geral: g, _dbg: { vendasRaw: raw.vendas.length, parcelasRaw: filhos.length, paisRaw: pais.length } };
 }
 
 /* ---------------- cálculo ---------------- */
@@ -434,6 +467,8 @@ function churnAte(D, m){ return D.clientes.filter(c => c.status === 'churn' && c
 function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() === m); }
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
 const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
+const atrAno = (D) => (D.atrasadas || []);
+const atrMes = (D, m) => (D.atrasadas || []).filter(a => a.y === ANO && a.m === m);
 const vendasMes = (D, m) => D.vendas.filter(v => v.y === ANO && v.m === m);
 const pagAno = (D) => (D.pagamentos || []).filter(p => p.y == null || p.y === ANO);
 const pagMes = (D, m) => (D.pagamentos || []).filter(p => p.y === ANO && p.m === m);
@@ -460,6 +495,7 @@ function calcAcumulado(D){
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: D.geral.nrrAnual,
     prod: D.geral.prodAnual != null ? D.geral.prodAnual : media(rankAno.map(r => r.prod)),
+    atrasadas: atrAno(D).length,
     nps: media(respAno.map(r => r.nps)),
     csat: media(respAno.map(r => r.csat)),
     ltv: media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)),
@@ -496,6 +532,7 @@ function calcMes(D, m){
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: atual ? D.geral.nrrMensal : null,
     prod: media(rk.map(r => r.prod)),
+    atrasadas: atrMes(D, m).length,
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
     ltv: atual ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
@@ -533,6 +570,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: null,
     prod: media(rk.map(r => r.prod)),
+    atrasadas: janela.flatMap(m => atrMes(D, m)).length,
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
     ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
@@ -555,9 +593,10 @@ const METRICAS = [
   { id:'ticket',   label:'Ticket Médio',    span:'s5', get:d=>d.ticket,   fmt:fmtBRL2, brl:true, recon:true, sub:()=>'mrr ÷ ativos' },
   { id:'nrr',      label:'NRR',             span:'s5', get:d=>d.nrr,      fmt:fmt2,    un:'%' },
   { id:'prod',     label:'Produtividade',   span:'',   get:d=>d.prod,     fmt:v=>v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:1}), un:'%' },
+  { id:'atrasadas',label:'Tarefas Atrasadas',span:'',  get:d=>d.atrasadas,fmt:fmtInt,  inv:true, sub:()=>'abertas e vencidas' },
   { id:'nps',      label:'NPS Geral',       span:'',   get:d=>d.nps,      fmt:fmt2 },
   { id:'csat',     label:'CSAT',            span:'',   get:d=>d.csat,     fmt:fmt2 },
-  { id:'ltv',      label:'LTV',             span:'s8', get:d=>d.ltv,      fmt:fmtBRL2, brl:true, sub:()=>'média por cliente ativo' },
+  { id:'ltv',      label:'LTV',             span:'',   get:d=>d.ltv,      fmt:fmtBRL2, brl:true, sub:()=>'média por cliente ativo' },
   { id:'churnRS',  label:'Churn R$',        span:'',   get:d=>d.churnRS,  fmt:fmtBRL0, brl:true, inv:true },
   { id:'churnN',   label:'Churn Nº',        span:'',   get:d=>d.churnN,   fmt:fmtInt,  inv:true },
   { id:'churnPct', label:'Churn %',         span:'',   get:d=>d.churnPct, fmt:fmt2,    un:'%', inv:true },
@@ -801,6 +840,14 @@ function detalheDados(){
         'média da tabela ' + fmt2(media(rk.map(r => r.prod))) + '%' };
   }
 
+  if (id === 'atrasadas') {
+    const at = (mes == null ? atrAno(D) : mesesJanela.flatMap(m => atrMes(D, m))).slice().sort((a,b) => b.dias - a.dias);
+    return { cols:['Tarefa','Lista','Responsável','Status','Vencimento','Dias'],
+      rows: at.map(a => [a.nome, a.lista, a.quem, a.status, dataBR(a.due), fmtInt(a.dias)]),
+      resumo: at.length + (at.length === 1 ? ' tarefa aberta e vencida' : ' tarefas abertas e vencidas') +
+        ' · spaces da operação desde 01/07/26 · Cross-Sell fora · mesma régua da Produtividade Diária' };
+  }
+
   if (id === 'nps' || id === 'csat') {
     const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : respMes(D, mes))
       .filter(r => (id === 'csat' ? r.csat : r.nps) != null);
@@ -861,10 +908,11 @@ async function carrega(){
       return;
     }
     state.D = null; renderTudo(); // skeleton
-    const [growth, vendas, csat, ranking, card2026] = await Promise.all([
-      fetchTasks(LISTA.growth), fetchTasks(LISTA.vendas, true), fetchTasks(LISTA.csat), fetchTasks(LISTA.ranking), fetchJSON('task/' + CARD_2026 + '?include_subtasks=false')
+    const [growth, vendas, csat, ranking, card2026, atrasadas] = await Promise.all([
+      fetchTasks(LISTA.growth), fetchTasks(LISTA.vendas, true), fetchTasks(LISTA.csat), fetchTasks(LISTA.ranking), fetchJSON('task/' + CARD_2026 + '?include_subtasks=false'),
+      fetchAtrasadas().catch(() => [])
     ]);
-    computa(parseTudo({ growth, vendas, csat, ranking, card2026 }));
+    computa(parseTudo({ growth, vendas, csat, ranking, card2026, atrasadas }));
     $('#sync-ts').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     renderTudo();
   } catch (err) {
