@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 16:58</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 17:05</b></div>
   </div>
 </aside>
 
@@ -555,7 +555,10 @@ function calcMes(D, m){
     atrasadas: atrMes(D, m).length,
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
-    ltv: atual ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
+    // LTV dos meses passados (10/09/26, Bruno): reconstruído = média, por cliente ativo no fim do mês,
+    // de Valor Recorrente × meses desde a entrada até o fim do mês (mesma conta do campo LTV da Growth); mês corrente lê o campo.
+    ltv: atual ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv))
+               : media(ativos.filter(c => c.vr > 0 && c.entrada).map(c => c.vr * Math.max(0, mesesEntre(c.entrada, fim)))),
     churnRS, churnN: chM.length,
     churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
@@ -621,7 +624,7 @@ const METRICAS = [
   { id:'atrasadas',label:'Tarefas Atrasadas',span:'',  get:d=>d.atrasadas,fmt:fmtInt,  inv:true, sub:()=>'abertas e vencidas' },
   { id:'nps',      label:'NPS Geral',       span:'',   get:d=>d.nps,      fmt:fmt2 },
   { id:'csat',     label:'CSAT',            span:'',   get:d=>d.csat,     fmt:fmt2 },
-  { id:'ltv',      label:'LTV',             span:'',   get:d=>d.ltv,      fmt:fmtBRL2, brl:true, sub:()=>'média por cliente ativo' },
+  { id:'ltv',      label:'LTV',             span:'',   get:d=>d.ltv,      fmt:fmtBRL2, brl:true, recon:'mes', sub:()=>'média por cliente ativo' },
   { id:'churnRS',  label:'Churn R$',        span:'',   get:d=>d.churnRS,  fmt:fmtBRL0, brl:true, inv:true },
   { id:'churnN',   label:'Churn Nº',        span:'',   get:d=>d.churnN,   fmt:fmtInt,  inv:true },
   { id:'churnPct', label:'Churn %',         span:'',   get:d=>d.churnPct, fmt:fmt2,    un:'%', inv:true },
