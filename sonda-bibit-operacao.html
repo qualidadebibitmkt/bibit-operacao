@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 17:05</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 17:09</b></div>
   </div>
 </aside>
 
@@ -601,7 +601,9 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     atrasadas: janela.flatMap(m => atrMes(D, m)).length,
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
-    ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
+    // LTV do trimestre: fotografia no fim do tri — campo da Growth se o tri é o corrente, senão reconstruído (VR × meses desde a entrada)
+    ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv))
+                : media(ativos.filter(c => c.vr > 0 && c.entrada).map(c => c.vr * Math.max(0, mesesEntre(c.entrada, fim)))),
     churnRS, churnN: chT.length,
     churnPct: media(churnPctMeses.map(x => x.pct)),   // TRIMESTRE (10/09/26, Bruno, decisão final): MÉDIA SIMPLES dos churn % mensais
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
