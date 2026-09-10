@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>26/08 14:35</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 15:50</b></div>
   </div>
 </aside>
 
@@ -469,6 +469,8 @@ function ativosEm(D, ts){ return D.clientes.filter(c => c.entrada && c.entrada <
 function churnAte(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() <= m); }
 function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() === m); }
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
+/* Churn % do mês = churn R$ do mês ÷ MRR do início do mês (mesma conta do calcMes). */
+function churnPctMes(D, m){ const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); return base ? (soma(churnNoMes(D, m).map(c => c.vr)) / base) * 100 : null; }
 const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
 const atrAno = (D) => (D.atrasadas || []);
 const atrMes = (D, m) => (D.atrasadas || []).filter(a => a.y === ANO && a.m === m);
@@ -568,7 +570,10 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
   const cross = soma(pg.map(p => p.valor));
   const up = rk.length ? soma(rk.map(r => r.up)) : null;
   const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
+  // Churn % do trimestre (10/09/26, Bruno): MÉDIA SIMPLES dos churn % mensais — fica na escala da meta mensal (≤ 5%).
+  const churnPctMeses = janela.map(m => ({ m, pct: churnPctMes(D, m) }));
   return {
+    meses: janela, churnPctMeses,
     ativos: ativos.length, mrr,
     ticket: ativos.length ? mrr / ativos.length : null,
     nrr: null,
@@ -578,7 +583,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     csat: media(rs.map(r => r.csat)),
     ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)) : null,
     churnRS, churnN: chT.length,
-    churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
+    churnPct: media(churnPctMeses.map(x => x.pct)),
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
     tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
@@ -663,20 +668,25 @@ function renderTitulo(){
   }
 }
 
+function labelAnterior(){
+  const q = triDe(state.periodo);
+  if (q != null) { const a = state.tris[q - 1]; return 'T' + q + (a && a.meses && a.meses.length < 3 ? ' (' + a.meses.length + ' meses)' : ''); }
+  return MESES[state.periodo - 1];
+}
 function deltaChip(mDef, atual, ant){
   if (state.periodo === 'acc' || ant == null || atual == null) return '';
   const a = mDef.get(atual), b = mDef.get(ant);
   if (a == null || b == null) return '';
   const diff = a - b;
   const pct = b !== 0 ? (diff / Math.abs(b)) * 100 : null;
-  if (Math.abs(diff) < 1e-9) return '<span class="delta flat">= vs ' + MESES[state.periodo - 1] + '</span>';
+  if (Math.abs(diff) < 1e-9) return '<span class="delta flat">= vs ' + labelAnterior() + '</span>';
   const melhor = mDef.inv ? diff < 0 : diff > 0;
   const cls = melhor ? 'up' : 'down';
   const sinal = diff > 0 ? '+' : '−';
   const corpo = pct != null && isFinite(pct)
     ? sinal + Math.abs(pct).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%'
     : sinal + fmtBRL0(Math.abs(diff));
-  return '<span class="delta ' + cls + '">' + corpo + ' vs ' + MESES[state.periodo - 1] + '</span>';
+  return '<span class="delta ' + cls + '">' + corpo + ' vs ' + labelAnterior() + '</span>';
 }
 
 function renderGrid(){
@@ -804,9 +814,13 @@ function detalheDados(){
       .map(c => [c.nome, din(c.vr), dataBR(c.saida), fmt2(c.tmp != null ? c.tmp : ((c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null))]);
     const tot = soma(chs.map(c => c.vr));
     const base = mes == null ? (D.geral.mrrAcum || null) : soma(ativosEm(D, iniMes(mesesJanela[0]) - 1).map(c => c.vr));
+    let pctTxt = base ? ' · ' + fmt2(tot / base * 100) + '% sobre base ' + din(base) : '';
+    if (triQ != null) {
+      const pm = mesesJanela.map(m => ({ m, pct: churnPctMes(D, m) }));
+      pctTxt = ' · churn % = média dos meses (' + pm.map(x => MESES[x.m] + ' ' + (x.pct == null ? '—' : fmt2(x.pct) + '%')).join(', ') + ') = ' + fmt2(media(pm.map(x => x.pct))) + '%';
+    }
     return { cols:['Cliente','Valor Recorrente','Saída','TMP (meses)'], rows,
-      resumo: chs.length + (chs.length === 1 ? ' churn' : ' churns') + ' · ' + din(tot) +
-        (base ? ' · ' + fmt2(tot / base * 100) + '% sobre base ' + din(base) : '') };
+      resumo: chs.length + (chs.length === 1 ? ' churn' : ' churns') + ' · ' + din(tot) + pctTxt };
   }
 
   if (id === 'cross') {
@@ -879,7 +893,7 @@ function renderDetalhe(){
   const box = $('#detalhe-corpo');
   const mDef = METRICAS.find(x => x.id === state.metric);
   $('#detalhe-titulo').innerHTML = '<em>' + mDef.label + '</em> · ' +
-    (state.periodo === 'acc' ? 'acumulado ' + ANO : MESES_FULL[state.periodo]);
+    (state.periodo === 'acc' ? 'acumulado ' + ANO : (triDe(state.periodo) != null ? (triDe(state.periodo) + 1) + '\u00ba trimestre ' + ANO : MESES_FULL[state.periodo]));
   const det = state.D ? detalheDados() : null;
   if (!det || !det.rows.length) { box.innerHTML = '<div class="vazio">— sem registros no período</div>'; return; }
   let html = '<div class="resumo-det">' + det.resumo + '</div><div class="tabela-wrap"><table class="tabela"><thead><tr>' +
