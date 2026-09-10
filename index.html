@@ -471,14 +471,15 @@ function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' &&
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
 const mesesExibidos = () => { const a = []; for (let m = MES_INICIO; m <= MES_ATUAL; m++) a.push(m); return a; };
 /* Churn % do mês = churn R$ do mês ÷ MRR do início do mês (mesma conta do calcMes). */
-// NRR mensal calculado (10/09/26, Bruno): (MRR início do mês + upsell + downsell − churn R$) ÷ MRR início do mês.
-// Cross-sell fica FORA (é pontual, nunca recorrente). Usado para o NRR dos trimestres = média dos meses.
+// NRR mensal calculado (10/09/26, Bruno): (MRR início do mês + cross-sell recebido + upsell + downsell − churn R$) ÷ MRR início do mês.
+// Cross-sell ENTRA (decisão do Bruno 10/09/26, mesma régua do cenário 5649077 / card 2026), pelo recebido no mês (regime de caixa).
 function nrrMes(D, m){
   const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); if (!base) return null;
   const rk = rankMes(D, m);
+  const cross = soma(pagMes(D, m).map(p => p.valor));
   const up = soma(rk.map(r => r.up)), down = negDown(soma(rk.map(r => r.down))) || 0;
   const churn = soma(churnNoMes(D, m).map(c => c.vr));
-  return ((base + up + down - churn) / base) * 100;
+  return ((base + cross + up + down - churn) / base) * 100;
 }
 function churnPctMes(D, m){ const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); return base ? (soma(churnNoMes(D, m).map(c => c.vr)) / base) * 100 : null; }
 const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
@@ -892,10 +893,10 @@ function detalheDados(){
     const t = dadosPeriodo() || {};
     const rows = (t.nrrMeses || []).map(x => {
       const base = soma(ativosEm(D, iniMes(x.m) - 1).map(c => c.vr)), rk = rankMes(D, x.m);
-      return [MESES[x.m], din(base), din(soma(rk.map(r => r.up))), din(negDown(soma(rk.map(r => r.down))) || 0), din(soma(churnNoMes(D, x.m).map(c => c.vr))), x.v == null ? '—' : fmt2(x.v) + '%'];
+      return [MESES[x.m], din(base), din(soma(pagMes(D, x.m).map(p => p.valor))), din(soma(rk.map(r => r.up))), din(negDown(soma(rk.map(r => r.down))) || 0), din(soma(churnNoMes(D, x.m).map(c => c.vr))), x.v == null ? '—' : fmt2(x.v) + '%'];
     });
-    return { cols:['Mês','MRR início','Upsell','Downsell','Churn R$','NRR'], rows,
-      resumo: 'NRR do trimestre = média dos meses = ' + (t.nrr == null ? '—' : fmt2(t.nrr) + '%') + ' · NRR mês = (MRR início + up + down − churn) ÷ MRR início · cross-sell fora' };
+    return { cols:['Mês','MRR início','Cross (recebido)','Upsell','Downsell','Churn R$','NRR'], rows,
+      resumo: 'NRR do trimestre = média dos meses = ' + (t.nrr == null ? '—' : fmt2(t.nrr) + '%') + ' · NRR mês = (MRR início + cross recebido + up + down − churn) ÷ MRR início' };
   }
   if (id === 'nrr') {
     return { cols:['Métrica','Valor','Fonte'], rows: [
