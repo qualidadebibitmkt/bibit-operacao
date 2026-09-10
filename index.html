@@ -296,10 +296,12 @@ const fmtInt  = (v) => v == null ? '—' : v.toLocaleString('pt-BR', { maximumFr
 
 function normaliza(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 
-function parseMesAno(txt, fallbackTs){
+function parseMesAno(txt, fallbackTs, nomeTask){
   const t = normaliza(txt);
   let m = null, y = null, mm;
-  if ((mm = t.match(/(\d{1,2})\s*[\/\-\.]\s*(\d{4})/))) { m = parseInt(mm[1], 10) - 1; y = parseInt(mm[2], 10); }
+  // aceita "09/26" e "09/2026" (o campo Mês/Ano do CSAT vem com ano de 2 dígitos)
+  if ((mm = t.match(/(\d{1,2})\s*[\/\-\.]\s*(\d{2}|\d{4})\b/))) { m = parseInt(mm[1], 10) - 1; y = parseInt(mm[2], 10); if (y < 100) y += 2000; }
+  else if (nomeTask && (mm = normaliza(nomeTask).match(/(\d{1,2})\s*\/\s*(\d{2}|\d{4})\b(?!.*\d{1,2}\s*\/\s*\d{2,4}\b)/))) { m = parseInt(mm[1], 10) - 1; y = parseInt(mm[2], 10); if (y < 100) y += 2000; }
   else {
     for (let i = 0; i < 12; i++) if (t.includes(normaliza(MESES_FULL[i])) || t.match(new RegExp('\\b' + MESES[i] + '\\b'))) { m = i; break; }
     const ym = t.match(/20\d{2}/); if (ym) y = parseInt(ym[0], 10);
@@ -412,7 +414,7 @@ function parseTudo(raw){
 
   const respostas = raw.csat.map(t => {
     const notas = [cfNum(t, CF.csatTraf), cfNum(t, CF.csatSM), cfNum(t, CF.csatRP), cfNum(t, CF.csatVideo)].filter(v => v != null && v > 0);
-    const per = parseMesAno(cfVal(t, CF.mesAno), t.date_created);
+    const per = parseMesAno(cfVal(t, CF.mesAno), t.date_created, t.name);
     return { nome: t.name, csat: notas.length ? soma(notas) / notas.length : null, nps: cfNum(t, CF.npsGeral), m: per ? per.m : null, y: per ? per.y : null };
   });
 
