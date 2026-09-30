@@ -7,6 +7,8 @@ const ALLOW = [
   /^list\/901713519081\/task/,   // Cross-Sell (vendas)
   /^list\/901713333681\/task/,   // CSAT - Envios (CSAT + NPS)
   /^list\/901713545639\/task/,   // Ranking (produtividade / up-down mensais)
+  /^list\/901713575176\/task/,   // Upsell (cards de upsell — fonte direta, 30/09/26)
+  /^list\/901713577414\/task/,   // Downsell (cards de downsell — fonte direta, 30/09/26)
   /^task\/86e1fwefa/,            // Card 2026 (métricas gerais)
   /^team\/90171091630\/task/     // Tarefas da operação (atrasadas abertas — spaces filtrados na query)
 ];
