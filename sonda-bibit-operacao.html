@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>30/09 11:20</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>30/09 11:25</b></div>
   </div>
 </aside>
 
@@ -364,17 +364,6 @@ async function fetchTasks(listId, incluirSub){
 }
 
 async function fetchAtrasadas(){
-  // Movimentações de mensalidade pelas listas Upsell/Downsell (fonte direta). Valor = |Diferença| ou |atual − antigo|.
-  const movim = (lista, sinal) => (lista || []).filter(t => !t.parent).map(t => {
-    const dif = cfNum(t, CF_DIF);
-    const novo = cfNum(t, CF_VAL_NOVO), antigo = cfNum(t, CF_VAL_ANTIGO);
-    const valor = dif != null ? Math.abs(dif) : (novo != null && antigo != null ? Math.abs(novo - antigo) : 0);
-    const ts = num(t.date_closed) || num(t.date_done) || num(t.date_created);
-    const d = ts ? new Date(ts) : null;
-    return { nome: t.name, valor, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, sinal };
-  }).filter(x => x.valor > 0 && x.m != null);
-  const upsells = movim(raw.upsell, 1), downsells = movim(raw.downsell, -1);
-
   const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
   const qs = SPACES_OPERACAO.map(id => 'space_ids[]=' + id).join('&') +
     '&subtasks=true&include_closed=false&due_date_gt=' + (BASE_ATRASO - 1) + '&due_date_lt=' + (hoje0.getTime() - 1);
@@ -477,6 +466,17 @@ function parseTudo(raw){
       quem: (t.assignees || []).map(a => a.username).join(', ') || '—', due, m: d.getMonth(), y: d.getFullYear(),
       dias: Math.max(0, Math.floor((hoje0.getTime() - due) / 86400000)), url: t.url };
   });
+
+  // Movimentações de mensalidade pelas listas Upsell/Downsell (fonte direta). Valor = |Diferença| ou |atual − antigo|.
+  const movim = (lista, sinal) => (lista || []).filter(t => !t.parent).map(t => {
+    const dif = cfNum(t, CF_DIF);
+    const novo = cfNum(t, CF_VAL_NOVO), antigo = cfNum(t, CF_VAL_ANTIGO);
+    const valor = dif != null ? Math.abs(dif) : (novo != null && antigo != null ? Math.abs(novo - antigo) : 0);
+    const ts = num(t.date_closed) || num(t.date_done) || num(t.date_created);
+    const d = ts ? new Date(ts) : null;
+    return { nome: t.name, valor, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, sinal };
+  }).filter(x => x.valor > 0 && x.m != null);
+  const upsells = movim(raw.upsell, 1), downsells = movim(raw.downsell, -1);
 
   const g = {}; for (const [k, id] of Object.entries(CF)) g[k] = cfNum(raw.card2026, id);
   return { clientes, vendas, pagamentos, respostas, ranking, upsells, downsells, atrasadas, geral: g, _dbg: { vendasRaw: raw.vendas.length, parcelasRaw: filhos.length, paisRaw: pais.length } };
