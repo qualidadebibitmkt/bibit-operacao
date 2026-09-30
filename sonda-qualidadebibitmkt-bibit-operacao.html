@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>10/09 17:09</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>30/09 11:20</b></div>
   </div>
 </aside>
 
@@ -234,8 +234,15 @@ const LISTA = {
   growth:   '901712531318',
   vendas:   '901713519081',
   csat:     '901713333681',
-  ranking:  '901713545639'
+  ranking:  '901713545639',
+  upsell:   '901713575176',
+  downsell: '901713577414'
 };
+// Cards de Upsell/Downsell: "Diferença" = valor do plano atual − valor do antigo (negativa no downsell);
+// o mês da movimentação é a data de fechamento do card (o campo "Upsell/Downsell Mês" do Ranking nunca foi preenchido pelo Make — 30/09/26).
+const CF_DIF = '448b9ff7-9a88-42a6-b59a-0ec857b43591';
+const CF_VAL_NOVO = 'd159b59c-0bcb-44c4-a360-951884e72045';
+const CF_VAL_ANTIGO = 'ac36c53a-d748-4e3c-bfa6-a21cda34b8d1';
 const CARD_2026 = '86e1fwefa';
 
 /* Tarefas atrasadas (abertas e vencidas) — mesma régua do cenário "Produtividade Diária" (5470796):
@@ -357,6 +364,17 @@ async function fetchTasks(listId, incluirSub){
 }
 
 async function fetchAtrasadas(){
+  // Movimentações de mensalidade pelas listas Upsell/Downsell (fonte direta). Valor = |Diferença| ou |atual − antigo|.
+  const movim = (lista, sinal) => (lista || []).filter(t => !t.parent).map(t => {
+    const dif = cfNum(t, CF_DIF);
+    const novo = cfNum(t, CF_VAL_NOVO), antigo = cfNum(t, CF_VAL_ANTIGO);
+    const valor = dif != null ? Math.abs(dif) : (novo != null && antigo != null ? Math.abs(novo - antigo) : 0);
+    const ts = num(t.date_closed) || num(t.date_done) || num(t.date_created);
+    const d = ts ? new Date(ts) : null;
+    return { nome: t.name, valor, m: d ? d.getMonth() : null, y: d ? d.getFullYear() : null, sinal };
+  }).filter(x => x.valor > 0 && x.m != null);
+  const upsells = movim(raw.upsell, 1), downsells = movim(raw.downsell, -1);
+
   const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
   const qs = SPACES_OPERACAO.map(id => 'space_ids[]=' + id).join('&') +
     '&subtasks=true&include_closed=false&due_date_gt=' + (BASE_ATRASO - 1) + '&due_date_lt=' + (hoje0.getTime() - 1);
@@ -461,7 +479,7 @@ function parseTudo(raw){
   });
 
   const g = {}; for (const [k, id] of Object.entries(CF)) g[k] = cfNum(raw.card2026, id);
-  return { clientes, vendas, pagamentos, respostas, ranking, atrasadas, geral: g, _dbg: { vendasRaw: raw.vendas.length, parcelasRaw: filhos.length, paisRaw: pais.length } };
+  return { clientes, vendas, pagamentos, respostas, ranking, upsells, downsells, atrasadas, geral: g, _dbg: { vendasRaw: raw.vendas.length, parcelasRaw: filhos.length, paisRaw: pais.length } };
 }
 
 /* ---------------- cálculo ---------------- */
@@ -475,14 +493,16 @@ const mesesExibidos = () => { const a = []; for (let m = MES_INICIO; m <= MES_AT
 // Cross-sell ENTRA (decisão do Bruno 10/09/26, mesma régua do cenário 5649077 / card 2026), pelo recebido no mês (regime de caixa).
 function nrrMes(D, m){
   const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); if (!base) return null;
-  const rk = rankMes(D, m);
   const cross = soma(pagMes(D, m).map(p => p.valor));
-  const up = soma(rk.map(r => r.up)), down = negDown(soma(rk.map(r => r.down))) || 0;
+  const up = upMes(D, m), down = negDown(downMes(D, m)) || 0;
   const churn = soma(churnNoMes(D, m).map(c => c.vr));
   return ((base + cross + up + down - churn) / base) * 100;
 }
 function churnPctMes(D, m){ const base = soma(ativosEm(D, iniMes(m) - 1).map(c => c.vr)); return base ? (soma(churnNoMes(D, m).map(c => c.vr)) / base) * 100 : null; }
 const rankMes = (D, m) => D.ranking.filter(r => r.y === ANO && r.m === m);
+// Upsell/Downsell do mês: cards das listas Upsell/Downsell fechados no mês; o campo do Ranking fica como fallback se algum mês só tiver ele.
+const upMes = (D, m) => { const v = soma((D.upsells || []).filter(x => x.y === ANO && x.m === m).map(x => x.valor)); return v || soma(rankMes(D, m).map(r => r.up)); };
+const downMes = (D, m) => { const v = soma((D.downsells || []).filter(x => x.y === ANO && x.m === m).map(x => x.valor)); return v || soma(rankMes(D, m).map(r => r.down)); };
 const atrAno = (D) => (D.atrasadas || []);
 const atrMes = (D, m) => (D.atrasadas || []).filter(a => a.y === ANO && a.m === m);
 const vendasMes = (D, m) => D.vendas.filter(v => v.y === ANO && v.m === m);
@@ -501,10 +521,12 @@ function calcAcumulado(D){
   const pgAno = pagAno(D);
   const cross = soma(pgAno.map(p => p.valor));
   const crossContratado = soma(vendasAno.map(v => v.valor));
+  const upListas = soma((D.upsells || []).filter(x => x.y === ANO).map(x => x.valor));
+  const downListas = soma((D.downsells || []).filter(x => x.y === ANO).map(x => x.valor));
   const upClientes = soma(D.clientes.map(c => c.up));
   const downClientes = soma(D.clientes.map(c => c.down));
-  const up   = upClientes !== 0 ? upClientes : (D.geral.somaUp != null ? D.geral.somaUp : 0);
-  const down = negDown(downClientes !== 0 ? downClientes : (D.geral.somaDown != null ? D.geral.somaDown : 0));
+  const up   = upListas || (upClientes !== 0 ? upClientes : (D.geral.somaUp != null ? D.geral.somaUp : 0));
+  const down = negDown(downListas || (downClientes !== 0 ? downClientes : (D.geral.somaDown != null ? D.geral.somaDown : 0)));
   return {
     ativos: ativos.length,
     mrr,
@@ -542,8 +564,8 @@ function calcMes(D, m){
   const rk = rankMes(D, m), rs = respMes(D, m), pg = pagMes(D, m);
   const chAcum = churnAte(D, m);
   const cross = soma(pg.map(p => p.valor));
-  const up = rk.length ? soma(rk.map(r => r.up)) : null;
-  const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
+  const up = upMes(D, m);
+  const down = negDown(downMes(D, m));
   const atual = (m === MES_ATUAL);
   return {
     ativos: ativos.length,
@@ -586,8 +608,8 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
   const rk = janela.flatMap(m => rankMes(D, m)), rs = janela.flatMap(m => respMes(D, m)), pg = janela.flatMap(m => pagMes(D, m));
   const chAcum = churnAte(D, m1);
   const cross = soma(pg.map(p => p.valor));
-  const up = rk.length ? soma(rk.map(r => r.up)) : null;
-  const down = rk.length ? negDown(soma(rk.map(r => r.down))) : null;
+  const up = soma(janela.map(mm => upMes(D, mm)));
+  const down = negDown(soma(janela.map(mm => downMes(D, mm))));
   // Churn % do trimestre (10/09/26, Bruno): MÉDIA SIMPLES dos churn % mensais — fica na escala da meta mensal (≤ 5%).
   const churnPctMeses = janela.map(m => ({ m, pct: churnPctMes(D, m) }));
   // NRR do trimestre (10/09/26, Bruno): MÉDIA SIMPLES dos NRRs mensais calculados (meses sem base ficam fora da média).
@@ -900,7 +922,7 @@ function detalheDados(){
     const lista = triQ != null ? (t.nrrMeses || []) : [{ m: mes, v: t.nrr }];
     const rows = lista.map(x => {
       const base = soma(ativosEm(D, iniMes(x.m) - 1).map(c => c.vr)), rk = rankMes(D, x.m);
-      return [MESES[x.m], din(base), din(soma(pagMes(D, x.m).map(p => p.valor))), din(soma(rk.map(r => r.up))), din(negDown(soma(rk.map(r => r.down))) || 0), din(soma(churnNoMes(D, x.m).map(c => c.vr))), x.v == null ? '—' : fmt2(x.v) + '%'];
+      return [MESES[x.m], din(base), din(soma(pagMes(D, x.m).map(p => p.valor))), din(upMes(D, x.m)), din(negDown(downMes(D, x.m)) || 0), din(soma(churnNoMes(D, x.m).map(c => c.vr))), x.v == null ? '—' : fmt2(x.v) + '%'];
     });
     const cardTxt = (mes === MES_ATUAL && D.geral.nrrMensal != null) ? ' · card 2026 (Make): ' + fmt2(D.geral.nrrMensal) + '%' : '';
     return { cols:['Mês','MRR início','Cross (recebido)','Upsell','Downsell','Churn R$','NRR'], rows,
@@ -958,11 +980,11 @@ async function carrega(){
       return;
     }
     state.D = null; renderTudo(); // skeleton
-    const [growth, vendas, csat, ranking, card2026, atrasadas] = await Promise.all([
+    const [growth, vendas, csat, ranking, card2026, atrasadas, upsell, downsell] = await Promise.all([
       fetchTasks(LISTA.growth), fetchTasks(LISTA.vendas, true), fetchTasks(LISTA.csat), fetchTasks(LISTA.ranking), fetchJSON('task/' + CARD_2026 + '?include_subtasks=false'),
-      fetchAtrasadas().catch(() => [])
+      fetchAtrasadas().catch(() => []), fetchTasks(LISTA.upsell).catch(() => []), fetchTasks(LISTA.downsell).catch(() => [])
     ]);
-    computa(parseTudo({ growth, vendas, csat, ranking, card2026, atrasadas }));
+    computa(parseTudo({ growth, vendas, csat, ranking, card2026, atrasadas, upsell, downsell }));
     $('#sync-ts').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     renderTudo();
   } catch (err) {

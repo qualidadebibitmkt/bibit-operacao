@@ -1,6 +1,18 @@
 {
- "geradoEm": "2026-09-10T19:59:57.081185",
+ "geradoEm": "2026-09-30T14:11:48.679221",
  "linhas": [
+  {
+   "nome": "Parcela 1/1 — R$ 100 (28/09)",
+   "valor": 100.0,
+   "mes": "09/2026",
+   "data": "28/09/26"
+  },
+  {
+   "nome": "Parcela 1/2 — R$ 3250 (21/09)",
+   "valor": 3250.0,
+   "mes": "09/2026",
+   "data": "21/09/26"
+  },
   {
    "nome": "Parcela 1/2 — R$ 1.750 (entrada 50%, 27/08)",
    "valor": 1750.0,
@@ -12,6 +24,12 @@
    "valor": 5500.0,
    "mes": "08/2026",
    "data": "27/08/26"
+  },
+  {
+   "nome": "Venga Vino - Migração Ecommerce - Tray para NuvemShop",
+   "valor": 1190.0,
+   "mes": "09/2026",
+   "data": "29/09/26"
   },
   {
    "nome": "Sub-rótulo Mare Nostrum - Maracujá",
@@ -42,6 +60,12 @@
    "valor": 5500.0,
    "mes": "06/2026",
    "data": "26/06/26"
+  },
+  {
+   "nome": "Parcela 3 — R$ 5900",
+   "valor": 5900.0,
+   "mes": "09/2026",
+   "data": "28/09/26"
   },
   {
    "nome": "Parcela 2 — R$ 5900",
