@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>30/09 11:25</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>30/09 11:30</b></div>
   </div>
 </aside>
 
@@ -881,6 +881,15 @@ function detalheDados(){
   }
 
   if (id === 'up' || id === 'down') {
+    // fonte direta: cards das listas Upsell/Downsell (30/09/26); mês = fechamento do card
+    const lista = (id === 'down' ? D.downsells : D.upsells) || [];
+    const noPeriodo = lista.filter(x => x.y === ANO && (mes == null || mesesJanela.includes(x.m)));
+    if (noPeriodo.length) {
+      const rows = noPeriodo.sort((a, b) => a.m - b.m || b.valor - a.valor).map(x => [x.nome.replace(/^(Upsell|Downsell)\s*\|\s*/i, ''), MESES[x.m] + '/' + String(x.y).slice(2), din(id === 'down' ? -x.valor : x.valor)]);
+      const tot = soma(noPeriodo.map(x => x.valor));
+      return { cols:['Cliente','Mês','Valor'], rows,
+        resumo: noPeriodo.length + (noPeriodo.length === 1 ? ' registro' : ' registros') + ' · Σ ' + din(id === 'down' ? -tot : tot) + ' · fonte: lista ' + (id === 'down' ? 'Downsell' : 'Upsell') + ' (diferença de mensalidade)' };
+    }
     if (mes == null) {
       const cls = D.clientes.filter(c => c[id]).sort((a,b) => Math.abs(b[id]) - Math.abs(a[id]));
       const tot = soma(cls.map(c => Math.abs(c[id])));
