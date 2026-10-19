@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>30/09 11:30</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>19/10 12:00</b></div>
   </div>
 </aside>
 
@@ -919,8 +919,10 @@ function detalheDados(){
   }
 
   if (id === 'nps' || id === 'csat') {
-    const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : respMes(D, mes))
-      .filter(r => (id === 'csat' ? r.csat : r.nps) != null);
+    // trimestre (19/10/26): lista as respostas de TODOS os meses do tri, não só do último — mesma janela do valor do card
+    const rs = (mes == null ? D.respostas.filter(r => r.y == null || r.y === ANO) : mesesJanela.flatMap(m => respMes(D, m)))
+      .filter(r => (id === 'csat' ? r.csat : r.nps) != null)
+      .sort((a, b) => (a.m ?? 99) - (b.m ?? 99));
     return { cols:['Envio','Mês','CSAT','NPS'],
       rows: rs.map(r => [r.nome || 'Envio', r.m != null ? MESES[r.m] : '—', r.csat != null ? fmt2(r.csat) : '—', r.nps != null ? fmt2(r.nps) : '—']),
       resumo: rs.length + ' respostas · CSAT médio ' + fmt2(media(rs.map(r => r.csat))) + ' · NPS médio ' + fmt2(media(rs.map(r => r.nps))) };

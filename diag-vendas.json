@@ -1,6 +1,18 @@
 {
- "geradoEm": "2026-09-30T14:23:10.013592",
+ "geradoEm": "2026-10-19T14:58:03.433360",
  "linhas": [
+  {
+   "nome": "Parcela 1/1 — R$ 100 (01/10)",
+   "valor": 100.0,
+   "mes": "10/2026",
+   "data": "01/10/26"
+  },
+  {
+   "nome": "Parcela 2 (saldo) — R$ 3250",
+   "valor": 3250.0,
+   "mes": "09/2026",
+   "data": "30/09/26"
+  },
   {
    "nome": "Parcela 1/1 — R$ 100 (28/09)",
    "valor": 100.0,
@@ -29,7 +41,7 @@
    "nome": "Venga Vino - Migração Ecommerce - Tray para NuvemShop",
    "valor": 1190.0,
    "mes": "09/2026",
-   "data": "29/09/26"
+   "data": "04/09/26"
   },
   {
    "nome": "Sub-rótulo Mare Nostrum - Maracujá",
