@@ -174,7 +174,7 @@
   <div class="side-foot">
     <div class="demo-flag">demo · dados de exemplo</div>
     <button class="btn-refresh" id="btn-refresh" type="button">↻ atualizar</button>
-    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>19/10 14:00</b></div>
+    <div class="sync">fonte <b>ClickUp</b><br>sync <b id="sync-ts">—</b><br>v <b>28/10 21:10</b></div>
   </div>
 </aside>
 
@@ -668,10 +668,25 @@ const METAS = {
   prod:     { v: 95,   dir: '>=', label: 'meta 95%' },
   nps:      { v: 9,    dir: '>=', label: 'meta 9' },
   csat:     { v: 9,    dir: '>=', label: 'meta 9' },
-  churnPct: { v: 5,    dir: '<=', label: 'meta ≤ 5%' }
+  churnPct: { v: 5,    dir: '<=', label: 'meta ≤ 5%' }   // meta antiga (até set/26) — ver metaChurn()
 };
+// Meta de churn (28/10/26, André): 4,5% a partir de OUTUBRO/26. Período com algum mês antes de out/26
+// (acumulado do ano, meses anteriores, 3º tri) segue na meta antiga de 5%; 4º tri e out/nov/dez usam 4,5%.
+const META_CHURN = { antiga: 5, nova: 4.5, mesInicioNova: 9 }; // índice 9 = outubro
+function mesesDoPeriodo(periodo){
+  const q = triDe(periodo);
+  if (periodo === 'acc') return mesesExibidos();
+  if (q != null) return [0,1,2].map(k => q * 3 + k);
+  return [periodo];
+}
+function metaChurn(periodo){
+  const ms = mesesDoPeriodo(periodo == null ? state.periodo : periodo);
+  const v = (ms.length && ms.every(m => m >= META_CHURN.mesInicioNova)) ? META_CHURN.nova : META_CHURN.antiga;
+  return { v, dir: '<=', label: 'meta ≤ ' + String(v).replace('.', ',') + '%' };
+}
+function metaDe(id){ return id === 'churnPct' ? metaChurn() : METAS[id]; }
 function metaEstado(id, v){
-  const m = METAS[id];
+  const m = metaDe(id);
   if (!m || v == null || !isFinite(v)) return null;
   const dentro = m.dir === '<=' ? v <= m.v : v >= m.v;
   return dentro ? 'ok' : 'fora';
@@ -747,7 +762,7 @@ function renderGrid(){
     const valorTxt = (v == null) ? '—'
       : (mDef.brl ? '<span class="pref">R$</span>' + mDef.fmt(v) : mDef.fmt(v) + (mDef.un ? '<span class="un">' + mDef.un + '</span>' : ''));
     let sub = (d && mDef.sub) ? mDef.sub(d) : null;
-    if (METAS[mDef.id]) sub = '<span class="metatag ' + (estado || '') + '">' + METAS[mDef.id].label + '</span>';
+    if (metaDe(mDef.id)) sub = '<span class="metatag ' + (estado || '') + '">' + metaDe(mDef.id).label + '</span>';
     card.innerHTML =
       '<div class="card-top"><span class="label">' + mDef.label + '</span>' +
       (showRecon ? '<span class="tag">reconstruído</span>' : '') + '</div>' +
