@@ -340,6 +340,9 @@ const prodAgregada = (rk) => { const v = rk.filter(r => r && r.tot > 0); const t
 const media = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 const soma  = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) : 0; };
 const mesesEntre = (a, b) => (b - a) / (1000 * 60 * 60 * 24 * 30.44);
+// TMP de churn (09/11/26, André): sempre entrada → saída. O campo "TMP Individual" do card é uma foto semanal
+// do cenário "TMP Ativos - Projetos" e congela quando o cliente sai do filtro (caso Salva/Bairrista: 1,97 e 2,43 com a mesma entrada e saída).
+const tmpChurnDe = c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : (c.tmp != null ? c.tmp : null);
 const negDown = (x) => x == null ? null : (x === 0 ? 0 : -Math.abs(x));  // downsell é sempre subtração
 
 /* ---------------- fetch ---------------- */
@@ -542,7 +545,7 @@ function calcAcumulado(D){
     // (carteira antes dessas saídas) — sem usar o acumulado do card 2026; mesma régua dos trimestres e dos individuais.
     // ACUMULADO (10/09/26, Bruno, decisão final): churn % = MÉDIA SIMPLES dos churn % mensais dos meses exibidos (mesma régua do trimestre).
     churnPct: media(mesesExibidos().map(m => churnPctMes(D, m))),
-    tmpChurn: media(churn.map(c => c.tmp != null ? c.tmp : (c.entrada && c.saida ? mesesEntre(c.entrada, c.saida) : null))),
+    tmpChurn: media(churn.map(tmpChurnDe)),
     tmpAtivos: media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))),
     down, cross, up,
     exp: cross + up + down,
@@ -882,7 +885,7 @@ function detalheDados(){
   if (['churnRS','churnN','churnPct','tmpChurn'].includes(id)) {
     const chs = mes == null ? D.clientes.filter(c => c.status === 'churn') : mesesJanela.flatMap(m => churnNoMes(D, m));
     const rows = chs.slice().sort((a,b) => (b.saida||0) - (a.saida||0))
-      .map(c => [c.nome, din(c.vr), dataBR(c.saida), fmt2(c.tmp != null ? c.tmp : ((c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null))]);
+      .map(c => [c.nome, din(c.vr), dataBR(c.saida), fmt2(tmpChurnDe(c))]);
     const tot = soma(chs.map(c => c.vr));
     const base = mes == null ? (D.geral.mrrAcum || null) : soma(ativosEm(D, iniMes(mesesJanela[0]) - 1).map(c => c.vr));
     let pctTxt = base ? ' · ' + fmt2(tot / base * 100) + '% sobre base ' + din(base) : '';
