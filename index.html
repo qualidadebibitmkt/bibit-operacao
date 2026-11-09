@@ -342,6 +342,8 @@ const soma  = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); re
 const mesesEntre = (a, b) => (b - a) / (1000 * 60 * 60 * 24 * 30.44);
 // TMP de churn (09/11/26, André): sempre entrada → saída. O campo "TMP Individual" do card é uma foto semanal
 // do cenário "TMP Ativos - Projetos" e congela quando o cliente sai do filtro (caso Salva/Bairrista: 1,97 e 2,43 com a mesma entrada e saída).
+// TMP de ativo (09/11/26, André): entrada → hoje para TODO status não-churn (execução, atrasado, encerramento) — o campo só serve se faltar a entrada.
+const tmpAtivoDe = c => c.entrada ? mesesEntre(c.entrada, Date.now()) : (c.tmp != null ? c.tmp : null);
 const tmpChurnDe = c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : (c.tmp != null ? c.tmp : null);
 const negDown = (x) => x == null ? null : (x === 0 ? 0 : -Math.abs(x));  // downsell é sempre subtração
 
@@ -546,7 +548,7 @@ function calcAcumulado(D){
     // ACUMULADO (10/09/26, Bruno, decisão final): churn % = MÉDIA SIMPLES dos churn % mensais dos meses exibidos (mesma régua do trimestre).
     churnPct: media(mesesExibidos().map(m => churnPctMes(D, m))),
     tmpChurn: media(churn.map(tmpChurnDe)),
-    tmpAtivos: media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))),
+    tmpAtivos: media(ativos.map(c => tmpAtivoDe(c))),
     down, cross, up,
     exp: cross + up + down,
     nVendas: vendasAno.length,
@@ -587,7 +589,7 @@ function calcMes(D, m){
     churnRS, churnN: chM.length,
     churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
-    tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
+    tmpAtivos: aoVivo ? media(ativos.map(c => tmpAtivoDe(c))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
     exp: (cross != null && up != null && down != null) ? cross + up + down : null,
     nVendas: null,
@@ -632,7 +634,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     churnRS, churnN: chT.length,
     churnPct: media(churnPctMeses.map(x => x.pct)),   // TRIMESTRE (10/09/26, Bruno, decisão final): MÉDIA SIMPLES dos churn % mensais
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
-    tmpAtivos: aoVivo ? media(ativos.map(c => c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
+    tmpAtivos: aoVivo ? media(ativos.map(c => tmpAtivoDe(c))) : media(ativos.map(c => c.entrada ? mesesEntre(c.entrada, fim) : null)),
     down, cross, up,
     exp: (cross != null && up != null && down != null) ? cross + up + down : null,
     nVendas: null, crossContratado: null, nPag: pg.length
@@ -871,7 +873,7 @@ function detalheDados(){
 
   const ativos = (mes == null || mes === MES_ATUAL) ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
   const tmpDe = c => mes == null
-    ? (c.tmp != null ? c.tmp : (c.entrada ? mesesEntre(c.entrada, Date.now()) : null))
+    ? (tmpAtivoDe(c))
     : (c.entrada ? mesesEntre(c.entrada, fim) : null);
 
   if (['ativos','mrr','ticket','tmpAtivos','ltv'].includes(id)) {
