@@ -257,6 +257,7 @@ const CF = {
   entrada: 'db1abd50-bc00-4097-92b9-ec639fbe3b04',
   saida:   'b969da4a-8bae-4f4c-9f8b-2919620a98e0',
   ltv:     '0da302e9-b65c-4453-84b8-07bbec61ab62',
+  cnpj:    'ecaf64af-c896-4dc6-941b-28604916fac7',
   tmp:     '6e1ab131-d931-4f9f-a135-af8051d8fc13',
   cCross:  'f698066f-80c2-4967-b81b-22fa29fc6c6b',
   cUp:     'b087f4f3-25ac-4445-a315-f47f55339f33',
@@ -340,6 +341,24 @@ const prodAgregada = (rk) => { const v = rk.filter(r => r && r.tot > 0); const t
 const media = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 const soma  = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) : 0; };
 const mesesEntre = (a, b) => (b - a) / (1000 * 60 * 60 * 24 * 30.44);
+// LTV por GRUPO (11/11/26, André): projetos que dividem o mesmo CNPJ (ex.: Proibida + Rock Brewing + Verano Ultra) contam como UM cliente no LTV.
+// O campo LTV da Growth é a soma paga na Marvee por CNPJ, então cada card do grupo carrega o total do grupo — a média contava esse total 1× por projeto.
+// Card sem CNPJ fica sozinho. valorDe(c) = LTV do card; agrega = 'max' (campo da Growth, já é o total do grupo) ou 'soma' (reconstruído por projeto).
+function gruposLtv(clientes, valorDe, agrega){
+  const mapa = new Map();
+  clientes.forEach((c, i) => {
+    const v = valorDe(c); if (v == null || !isFinite(v) || v <= 0) return;
+    const k = c.cnpj || ('sem-cnpj-' + i);
+    const g = mapa.get(k) || { membros: [], ltv: 0 };
+    g.membros.push(c);
+    g.ltv = agrega === 'soma' ? g.ltv + v : Math.max(g.ltv, v);
+    mapa.set(k, g);
+  });
+  return [...mapa.values()];
+}
+const ltvCampo = (clientes) => media(gruposLtv(clientes.filter(c => ATIVOS_STATUS.includes(c.status)), c => c.ltv, 'max').map(g => g.ltv));
+const ltvReconDe = (c, fim) => (c.vr > 0 && c.entrada) ? c.vr * Math.max(0, mesesEntre(c.entrada, fim)) : null;
+const ltvRecon = (ativos, fim) => media(gruposLtv(ativos, c => ltvReconDe(c, fim), 'soma').map(g => g.ltv));
 // TMP de churn (09/11/26, André): sempre entrada → saída. O campo "TMP Individual" do card é uma foto semanal
 // do cenário "TMP Ativos - Projetos" e congela quando o cliente sai do filtro (caso Salva/Bairrista: 1,97 e 2,43 com a mesma entrada e saída).
 // TMP de ativo (09/11/26, André): entrada → hoje para TODO status não-churn (execução, atrasado, encerramento) — o campo só serve se faltar a entrada.
@@ -396,6 +415,7 @@ function parseTudo(raw){
       entrada: cfNum(t, CF.entrada),
       saida: saidaCampo || (status === 'churn' ? num(t.date_closed) : null),
       ltv: cfNum(t, CF.ltv),
+      cnpj: String(cfVal(t, CF.cnpj) ?? '').replace(/\D/g, ''),
       tmp: cfNum(t, CF.tmp),
       cross: cfNum(t, CF.cCross) || 0,
       up: cfNum(t, CF.cUp) || 0,
@@ -541,7 +561,7 @@ function calcAcumulado(D){
     atrasadas: atrAno(D).length,
     nps: media(respAno.map(r => r.nps)),
     csat: media(respAno.map(r => r.csat)),
-    ltv: media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv)),
+    ltv: ltvCampo(D.clientes),
     churnRS, churnN: churn.length,
     // ACUMULADO (10/09/26, Bruno): churn % = R$ perdido nos meses exibidos ÷ MRR do início do período
     // (carteira antes dessas saídas) — sem usar o acumulado do card 2026; mesma régua dos trimestres e dos individuais.
@@ -584,8 +604,8 @@ function calcMes(D, m){
     csat: media(rs.map(r => r.csat)),
     // LTV dos meses passados (10/09/26, Bruno): reconstruído = média, por cliente ativo no fim do mês,
     // de Valor Recorrente × meses desde a entrada até o fim do mês (mesma conta do campo LTV da Growth); mês corrente lê o campo.
-    ltv: atual ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv))
-               : media(ativos.filter(c => c.vr > 0 && c.entrada).map(c => c.vr * Math.max(0, mesesEntre(c.entrada, fim)))),
+    ltv: atual ? ltvCampo(D.clientes)
+               : ltvRecon(ativos, fim),
     churnRS, churnN: chM.length,
     churnPct: mrrIni ? (churnRS / mrrIni) * 100 : null,
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
@@ -629,8 +649,8 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
     nps: media(rs.map(r => r.nps)),
     csat: media(rs.map(r => r.csat)),
     // LTV do trimestre: fotografia no fim do tri — campo da Growth se o tri é o corrente, senão reconstruído (VR × meses desde a entrada)
-    ltv: aoVivo ? media(D.clientes.filter(c => ATIVOS_STATUS.includes(c.status) && c.ltv > 0).map(c => c.ltv))
-                : media(ativos.filter(c => c.vr > 0 && c.entrada).map(c => c.vr * Math.max(0, mesesEntre(c.entrada, fim)))),
+    ltv: aoVivo ? ltvCampo(D.clientes)
+                : ltvRecon(ativos, fim),
     churnRS, churnN: chT.length,
     churnPct: media(churnPctMeses.map(x => x.pct)),   // TRIMESTRE (10/09/26, Bruno, decisão final): MÉDIA SIMPLES dos churn % mensais
     tmpChurn: chAcum.length ? media(chAcum.map(c => (c.entrada && c.saida) ? mesesEntre(c.entrada, c.saida) : null)) : null,
@@ -653,7 +673,7 @@ const METRICAS = [
   { id:'atrasadas',label:'Tarefas Atrasadas',span:'',  get:d=>d.atrasadas,fmt:fmtInt,  inv:true, sub:()=>'abertas e vencidas' },
   { id:'nps',      label:'NPS Geral',       span:'',   get:d=>d.nps,      fmt:fmt2 },
   { id:'csat',     label:'CSAT',            span:'',   get:d=>d.csat,     fmt:fmt2 },
-  { id:'ltv',      label:'LTV',             span:'',   get:d=>d.ltv,      fmt:fmtBRL2, brl:true, recon:'mes', sub:()=>'média por cliente ativo' },
+  { id:'ltv',      label:'LTV',             span:'',   get:d=>d.ltv,      fmt:fmtBRL2, brl:true, recon:'mes', sub:()=>'média por CNPJ ativo' },
   { id:'churnRS',  label:'Churn R$',        span:'',   get:d=>d.churnRS,  fmt:fmtBRL0, brl:true, inv:true },
   { id:'churnN',   label:'Churn Nº',        span:'',   get:d=>d.churnN,   fmt:fmtInt,  inv:true },
   { id:'churnPct', label:'Churn %',         span:'',   get:d=>d.churnPct, fmt:fmt2,    un:'%', inv:true },
@@ -876,7 +896,19 @@ function detalheDados(){
     ? (tmpAtivoDe(c))
     : (c.entrada ? mesesEntre(c.entrada, fim) : null);
 
-  if (['ativos','mrr','ticket','tmpAtivos','ltv'].includes(id)) {
+  if (id === 'ltv') {
+    // LTV por grupo de CNPJ: mês/tri corrente e acumulado leem o campo da Growth; passados são reconstruídos (VR × meses desde a entrada)
+    const vivo = (mes == null || mes === MES_ATUAL);
+    const gs = vivo ? gruposLtv(ativos, c => c.ltv, 'max') : gruposLtv(ativos, c => ltvReconDe(c, fim), 'soma');
+    const rows = gs.slice().sort((a,b) => b.ltv - a.ltv).map(g => {
+      const ents = g.membros.map(c => c.entrada).filter(Boolean);
+      return [g.membros.map(c => c.nome).join(' + '), String(g.membros.length), din(soma(g.membros.map(c => c.vr))), dataBR(ents.length ? Math.min(...ents) : null), din2(g.ltv)];
+    });
+    return { cols:['Cliente / grupo (mesmo CNPJ)','Projetos','Valor Recorrente','Entrada','LTV'], rows,
+      resumo: gs.length + ' CNPJs · ' + soma(gs.map(g => g.membros.length)) + ' projetos · LTV médio ' + din2(media(gs.map(g => g.ltv))) };
+  }
+
+  if (['ativos','mrr','ticket','tmpAtivos'].includes(id)) {
     const rows = ativos.slice().sort((a,b) => b.vr - a.vr)
       .map(c => [c.nome, din(c.vr), dataBR(c.entrada), tmpDe(c) != null ? fmt2(tmpDe(c)) : '—', c.ltv ? din2(c.ltv) : '—']);
     const mrr = soma(ativos.map(c => c.vr));
