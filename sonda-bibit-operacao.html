@@ -204,7 +204,8 @@
 
   <footer>
     Métricas de meses passados marcadas com <span class="tag" style="position:static">reconstruído</span> são recalculadas pelas
-    datas de entrada e saída dos clientes na Growth — os demais valores vêm dos mesmos campos que alimentam o dashboard do ClickUp.
+    datas de entrada e saída dos clientes na Growth. O MRR inclui clientes em onboarding (novo cliente, briefing, estratégia e kickoff)
+    desde o dia em que entraram na Growth; NRR, churn %, ticket, LTV e TMP seguem só pela carteira em execução — os demais valores vêm dos mesmos campos que alimentam o dashboard do ClickUp.
   </footer>
 </main>
 
@@ -292,6 +293,10 @@ const CF = {
 };
 
 const ATIVOS_STATUS = ['execução','execucao','atrasado','encerramento'];   // régua final do MRR (31/08/26, Bruno): execução + atrasado + encerramento
+// MRR com onboarding (24/11/26, André): novo cliente, briefing, estratégia e kickoff entram no MRR EXIBIDO, contando a partir do dia
+// em que o card entrou na Growth (data de criação do card). Só o card MRR e o gráfico dele mudam: Clientes Ativos, Ticket Médio, LTV,
+// TMP e o "MRR início do mês" (base do NRR e do churn %) seguem pela régua de execução (ATIVOS_STATUS / Data entrada execução).
+const ONBOARDING_STATUS = ['novo cliente','novocliente','briefing','estrategia','kickoff','kick off','kick-off'];
 
 /* ---------------- helpers ---------------- */
 const $ = (s) => document.querySelector(s);
@@ -413,6 +418,7 @@ function parseTudo(raw){
       status,
       vr: cfNum(t, CF.vr) || 0,
       entrada: cfNum(t, CF.entrada),
+      criado: num(t.date_created),
       saida: saidaCampo || (status === 'churn' ? num(t.date_closed) : null),
       ltv: cfNum(t, CF.ltv),
       cnpj: String(cfVal(t, CF.cnpj) ?? '').replace(/\D/g, ''),
@@ -509,6 +515,12 @@ function parseTudo(raw){
 
 /* ---------------- cálculo ---------------- */
 function ativosEm(D, ts){ return D.clientes.filter(c => c.entrada && c.entrada <= ts && (!c.saida || c.saida > ts)); }
+// Onboarding numa data: card já criado na Growth, ainda sem entrar em execução e sem ter saído. Vale pra quem está em onboarding
+// hoje e pra quem já passou por ele (Data entrada execução posterior à data) — assim o mês passado mostra o que estava entrando.
+function onboardingEm(D, ts){ return D.clientes.filter(c => c.criado && c.criado <= ts && (c.entrada ? c.entrada > ts : ONBOARDING_STATUS.includes(c.status)) && (!c.saida || c.saida > ts)); }
+const onboardingHoje = (D) => D.clientes.filter(c => ONBOARDING_STATUS.includes(c.status));
+// MRR exibido = execução (régua antiga, intacta) + onboarding. O ticket continua sobre a carteira em execução.
+function mrrCom(ativos, onb){ const mrrExec = soma(ativos.map(c => c.vr)), mrrOnb = soma(onb.map(c => c.vr)); return { mrr: mrrExec + mrrOnb, mrrExec, mrrOnb, nOnb: onb.length, ticket: ativos.length ? mrrExec / ativos.length : null }; }
 function churnAte(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() <= m); }
 function churnNoMes(D, m){ return D.clientes.filter(c => c.status === 'churn' && c.saida && new Date(c.saida).getFullYear() === ANO && new Date(c.saida).getMonth() === m); }
 const respMes = (D, m) => D.respostas.filter(r => r.y === ANO && r.m === m);
@@ -540,9 +552,8 @@ function calcAcumulado(D){
   const vendasAno = D.vendas.filter(v => v.y == null || v.y === ANO);
   const respAno = D.respostas.filter(r => r.y == null || r.y === ANO);
   const rankAno = D.ranking.filter(r => r.y === ANO);
-  const mrr = soma(ativos.map(c => c.vr));
+  const M = mrrCom(ativos, onboardingHoje(D));
   const churnRS = soma(churn.map(c => c.vr));
-  const mrrBaseChurn = D.geral.mrrAcum || (mrr + churnRS);
   const pgAno = pagAno(D);
   const cross = soma(pgAno.map(p => p.valor));
   const crossContratado = soma(vendasAno.map(v => v.valor));
@@ -554,8 +565,7 @@ function calcAcumulado(D){
   const down = negDown(downListas || (downClientes !== 0 ? downClientes : (D.geral.somaDown != null ? D.geral.somaDown : 0)));
   return {
     ativos: ativos.length,
-    mrr,
-    ticket: ativos.length ? mrr / ativos.length : null,
+    ...M,
     nrr: D.geral.nrrAnual,
     prod: D.geral.prodAnual != null ? D.geral.prodAnual : prodAgregada(rankAno),
     atrasadas: atrAno(D).length,
@@ -582,8 +592,8 @@ function calcMes(D, m){
   const fim = fimMes(m), ini = iniMes(m);
   const aoVivo = (m === MES_ATUAL);
   const ativos = aoVivo ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
-  const mrr = soma(ativos.map(c => c.vr));
-  const mrrIni = soma(ativosEm(D, ini - 1).map(c => c.vr));
+  const M = mrrCom(ativos, aoVivo ? onboardingHoje(D) : onboardingEm(D, fim));
+  const mrrIni = soma(ativosEm(D, ini - 1).map(c => c.vr));   // base do NRR e do churn %: só execução (não muda)
   const chM = churnNoMes(D, m);
   const churnRS = soma(chM.map(c => c.vr));
   const rk = rankMes(D, m), rs = respMes(D, m), pg = pagMes(D, m);
@@ -594,8 +604,7 @@ function calcMes(D, m){
   const atual = (m === MES_ATUAL);
   return {
     ativos: ativos.length,
-    mrr,
-    ticket: ativos.length ? mrr / ativos.length : null,
+    ...M,
     // NRR mensal (10/09/26, Bruno): calculado da Growth/Ranking em TODOS os meses (antes só o mês corrente lia o card 2026)
     nrr: nrrMes(D, m),
     prod: prodAgregada(rk),
@@ -625,8 +634,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
   const a0 = Math.max(m0, MES_INICIO);
   const fim = fimMes(m1), aoVivo = (m1 === MES_ATUAL);
   const ativos = aoVivo ? D.clientes.filter(c => ATIVOS_STATUS.includes(c.status)) : ativosEm(D, fim);
-  const mrr = soma(ativos.map(c => c.vr));
-  const mrrIni = soma(ativosEm(D, iniMes(a0) - 1).map(c => c.vr));
+  const M = mrrCom(ativos, aoVivo ? onboardingHoje(D) : onboardingEm(D, fim));
   const janela = []; for (let m = a0; m <= m1; m++) janela.push(m);
   const chT = janela.flatMap(m => churnNoMes(D, m));
   const churnRS = soma(chT.map(c => c.vr));
@@ -641,8 +649,7 @@ function calcTri(D, q){                                  // q = 0..3 → meses q
   const nrrMeses = janela.map(m => ({ m, v: nrrMes(D, m) }));
   return {
     meses: janela, churnPctMeses, nrrMeses,
-    ativos: ativos.length, mrr,
-    ticket: ativos.length ? mrr / ativos.length : null,
+    ativos: ativos.length, ...M,
     nrr: media(nrrMeses.map(x => x.v)),
     prod: prodAgregada(rk),
     atrasadas: janela.flatMap(m => atrMes(D, m)).length,
@@ -666,8 +673,9 @@ const mesFimTri = q => Math.min(q * 3 + 2, MES_ATUAL);
 /* ---------------- métricas (mesmos 17 cards do ClickUp) ---------------- */
 const METRICAS = [
   { id:'ativos',   label:'Clientes Ativos', span:'s5', get:d=>d.ativos,   fmt:fmtInt,  recon:true,  sub:d=>'carteira growth' },
-  { id:'mrr',      label:'MRR',             span:'s5', get:d=>d.mrr,      fmt:fmtBRL0, brl:true, recon:true },
-  { id:'ticket',   label:'Ticket Médio',    span:'s5', get:d=>d.ticket,   fmt:fmtBRL2, brl:true, recon:true, sub:()=>'mrr ÷ ativos' },
+  { id:'mrr',      label:'MRR',             span:'s5', get:d=>d.mrr,      fmt:fmtBRL0, brl:true, recon:true,
+    sub:d=>d.nOnb ? ('inclui R$ ' + fmtBRL0(d.mrrOnb) + ' em onboarding (' + d.nOnb + ')') : 'execução + onboarding' },
+  { id:'ticket',   label:'Ticket Médio',    span:'s5', get:d=>d.ticket,   fmt:fmtBRL2, brl:true, recon:true, sub:()=>'mrr em execução ÷ ativos' },
   { id:'nrr',      label:'NRR',             span:'s5', get:d=>d.nrr,      fmt:fmt2,    un:'%' },
   { id:'prod',     label:'Produtividade',   span:'',   get:d=>d.prod,     fmt:v=>v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:1}), un:'%' },
   { id:'atrasadas',label:'Tarefas Atrasadas',span:'',  get:d=>d.atrasadas,fmt:fmtInt,  inv:true, sub:()=>'abertas e vencidas' },
@@ -908,12 +916,25 @@ function detalheDados(){
       resumo: gs.length + ' CNPJs · ' + soma(gs.map(g => g.membros.length)) + ' projetos · LTV médio ' + din2(media(gs.map(g => g.ltv))) };
   }
 
-  if (['ativos','mrr','ticket','tmpAtivos'].includes(id)) {
+  if (id === 'mrr') {
+    // MRR exibido = execução + onboarding (24/11/26, André); onboarding conta desde a criação do card na Growth
+    const vivo = (mes == null || mes === MES_ATUAL);
+    const onb = vivo ? onboardingHoje(D) : onboardingEm(D, fim);
+    const M = mrrCom(ativos, onb);
+    const linha = (c, sit) => [c.nome, din(c.vr), sit, dataBR(c.criado), dataBR(c.entrada)];
+    const rows = ativos.slice().sort((a,b) => b.vr - a.vr).map(c => linha(c, vivo ? c.status : 'em execução'))
+      .concat(onb.slice().sort((a,b) => b.vr - a.vr).map(c => linha(c, vivo ? 'onboarding · ' + c.status : 'onboarding')));
+    return { cols:['Cliente','Valor Recorrente','Situação','Entrou na Growth','Entrada execução'], rows,
+      resumo: (ativos.length + onb.length) + ' clientes · MRR ' + din(M.mrr) + ' = execução ' + din(M.mrrExec) + ' (' + ativos.length + ') + onboarding ' + din(M.mrrOnb) + ' (' + onb.length + ')' +
+        ' · NRR, churn %, ticket, LTV e TMP seguem só pela carteira em execução' };
+  }
+
+  if (['ativos','ticket','tmpAtivos'].includes(id)) {
     const rows = ativos.slice().sort((a,b) => b.vr - a.vr)
       .map(c => [c.nome, din(c.vr), dataBR(c.entrada), tmpDe(c) != null ? fmt2(tmpDe(c)) : '—', c.ltv ? din2(c.ltv) : '—']);
     const mrr = soma(ativos.map(c => c.vr));
     return { cols:['Cliente','Valor Recorrente','Entrada','TMP (meses)','LTV'], rows,
-      resumo: ativos.length + ' clientes · MRR ' + din(mrr) + ' · ticket ' + din2(ativos.length ? mrr / ativos.length : null) };
+      resumo: ativos.length + ' clientes · MRR em execução ' + din(mrr) + ' · ticket ' + din2(ativos.length ? mrr / ativos.length : null) };
   }
 
   if (['churnRS','churnN','churnPct','tmpChurn'].includes(id)) {
