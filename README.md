@@ -15,7 +15,8 @@ Dashboard web do **DASHBOARD OPERAÇÃO - ACUMULADO** do ClickUp, com os mesmos 
 
 | Card | Fonte |
 |---|---|
-| Clientes Ativos, MRR, Ticket Médio | Growth `901712531318` — status execução/atrasado, campo Valor Recorrente (Ticket = MRR ÷ Ativos) |
+| Clientes Ativos, Ticket Médio | Growth `901712531318` — status execução/atrasado/encerramento, campo Valor Recorrente (Ticket = MRR em execução ÷ Ativos) |
+| MRR | Execução/atrasado/encerramento **+ onboarding** (novo cliente, briefing, estratégia, kickoff), contando desde a criação do card na Growth (24/11/26). NRR e churn % seguem com o MRR início do mês só de execução |
 | Churn R$ / Nº / % | Growth — status churn + Data de Saída; % = Churn R$ ÷ MRR Acumulado (card 2026) |
 | TMP (churn) / TMP (ativos) | Growth — campo TMP Individual (meses passados: recalculado pelas datas) |
 | LTV | Growth — média do campo LTV dos clientes ativos |
